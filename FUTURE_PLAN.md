@@ -1,3 +1,6 @@
+## tl;dr: Belphegor will switch to slash commands at the end of April
+
+
 So by the end of April, all bots will be required message intent or some sort to send normal messages for commands, *or* just go slash commands and YOLO. Since discord explicitly disapproves of using message intent for bot commands (iirc), slash commands is the only choice left.
 
 So I'll do that.
@@ -6,7 +9,7 @@ Which means Belphegor bot will undergo complete overhaul.
 No more `bel say some shitty stuff` -> Enter.  
 It's now `/say` -> select Belphegor from the list of 412412984565464 bots with the same `say` command -> `some shitty stuff` -> Enter.
 
-Since these slash commands have different interface than message commands, which means I have a lot of rewriting to process, so I may as well remake Belphegor from scratch (holy shit) (actually I'll still copy old codes over so it's not exactly *from scratch*).
+Since these slash commands have different interface than message commands, I will need a lot of rewriting to process, so may as well remake Belphegor from scratch (holy shit) (actually I'll still copy old codes over so it's not exactly *from scratch*).
 
 So here's the plan for now:
 1. Since Otogi is already EoS, may as well not keep the commands anymore. The bot name/avatar and old repo is enough to remind everyone of the game.
