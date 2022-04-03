@@ -2,8 +2,8 @@ So by the end of April, all bots will be required message intent or some sort to
 
 So I'll do that.
 
-Which means Belphegor bot will undergo complete overhaul.
-No more `bel say some shitty stuff` -> Enter.
+Which means Belphegor bot will undergo complete overhaul.  
+No more `bel say some shitty stuff` -> Enter.  
 It's now `/say` -> select Belphegor from the list of 412412984565464 bots with the same `say` command -> `some shitty stuff` -> Enter.
 
 Since these slash commands have different interface than message commands, which means I have a lot of rewriting to process, so I may as well remake Belphegor from scratch (holy shit) (actually I'll still copy old codes over so it's not exactly *from scratch*).
@@ -18,5 +18,5 @@ So here's the plan for now:
 7. Misc commands will be ported over, and fast.
 8. Experimental (presence tracking) commands will be kept I guess. No one actually uses it but it's there so image_processing.py doesn't collect dust.
 
-That's all for now I guess.
+That's all for now I guess.  
 If anyone has any question, suggestion, or request, pls send to my [deserted supported server](https://discord.gg/qnavjMy) since I mostly speak in gaming servers (yeeeeeeeah right that's kinda the reason for procrastination, games). I will try to answer most questions, but as I am bad at socializing I usually don't initiate conversations.
