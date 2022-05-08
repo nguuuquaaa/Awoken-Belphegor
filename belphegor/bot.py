@@ -3,17 +3,20 @@ from discord import app_commands as cmds
 from discord.ext import commands, tasks
 import asyncio
 
-from belphegor.db import MongoClientEX
+from belphegor.db import MongoClientEX, MongoDatabaseEX
 from belphegor import utils
 
 #=============================================================================================================================#
 
 class Belphegor(commands.Bot):
+    db_client: MongoClientEX
+    db: MongoDatabaseEX
+
     def __init__(self, *args, default_presence: discord.BaseActivity = None, **kwargs):
         self.initial_extensions = kwargs.pop("extensions")
         super().__init__(*args, **kwargs)
-        self.db_client = MongoClientEX()
-        self.db = self.db_client.woke_bel_db
+        self.db_client = None
+        self.db = None
 
         self.default_presence = default_presence
         self.startup_event = asyncio.Event()
@@ -39,6 +42,8 @@ class Belphegor(commands.Bot):
 
     async def start(self, token: str, *, reconnect: bool = True) -> None:
         asyncio.create_task(self.sync_commands())
+        self.db_client = MongoClientEX(io_loop = asyncio.get_running_loop())
+        self.db = self.db_client.belphydb
         return await super().start(token, reconnect=reconnect)
 
     def counter(self):
