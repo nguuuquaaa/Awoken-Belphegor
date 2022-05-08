@@ -1,4 +1,4 @@
-from typing import TypeVar, Literal
+from typing import TypeVar, Literal, overload
 from collections.abc import Sequence, Iterator, Iterable, Callable
 from itertools import zip_longest
 
@@ -22,28 +22,45 @@ class CircleIter(Iterator[_T]):
         self.cur = (self.cur + 1) % self.size
         return self.sequence[self.cur]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.size
+
+    @overload
+    def current(self, with_index: Literal[False] = False) -> _T:
+        ...
+
+    @overload
+    def current(self, with_index: Literal[True]) -> tuple[int, _T]:
+        ...
+
+    def current(self, with_index: bool = False) -> _T | tuple[int, _T]:
+        if with_index:
+            return self.cur, self.sequence[self.cur]
+        else:
+            return self.sequence[self.cur]
 
     def iter_once(self) -> Iterator[_T]:
         for _ in range(self.size):
             yield self.__next__()
 
 _S = TypeVar("_S")
-def grouper(iterable: Iterable[_T], n: int, *, incomplete: Literal["fill", "strict", "ignore"] = "fill", fillvalue: _T|_S|None = None) -> Iterable[tuple[_T|_S|None, ...]]:
+def grouper(iterable: Iterable[_T], n: int, *, incomplete: Literal["fill", "strict", "ignore", "missing"] = "fill", fillvalue: _T|_S|None = None) -> Iterable[tuple[_T|_S|None, ...]]:
     "Collect data into non-overlapping fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, fillvalue='x') --> ABC DEF Gxx
     # grouper('ABCDEFG', 3, incomplete='strict') --> ABC DEF ValueError
     # grouper('ABCDEFG', 3, incomplete='ignore') --> ABC DEF
     args = [iter(iterable)] * n
-    if incomplete == "fill":
-        return zip_longest(*args, fillvalue=fillvalue)
-    if incomplete == "strict":
-        return zip(*args, strict=True)
-    if incomplete == "ignore":
-        return zip(*args)
-    else:
-        raise ValueError("Expected fill, strict, or ignore")
+    match incomplete:
+        case "fill":
+            return zip_longest(*args, fillvalue = fillvalue)
+        case "strict":
+            return zip(*args, strict=True)
+        case "ignore":
+            return zip(*args)
+        case "missing":
+            return map(lambda x: tuple(filter(None, x)), zip_longest(*args, fillvalue = None))
+        case _:
+            raise ValueError("Expected fill, strict, ignore, or missing")
 
 def pairwise(iterable: Iterable[_T]) -> Iterable[tuple[_T, _T]]:
     return grouper(iterable, 2, incomplete="ignore")
