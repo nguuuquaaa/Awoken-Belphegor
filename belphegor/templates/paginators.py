@@ -1,8 +1,8 @@
 import discord
 from discord import app_commands as ac, ui
-from typing import TypeAlias, Any, Annotated, Generic, TypeVar, overload, Literal
+from typing import Any, Generic, TypeVar, overload, Literal, ForwardRef
 from typing_extensions import Self
-from collections.abc import Callable, Sequence, Mapping
+from collections.abc import Callable, AsyncGenerator
 import asyncio
 from pydantic.generics import GenericModel
 
@@ -14,7 +14,8 @@ from .selects import BaseSelect
 
 #=============================================================================================================================#
 
-_VT = TypeVar("_VT", str, int)
+_VT = TypeVar("_VT")
+_Item_VT = ForwardRef("Item[_VT]")
 
 #=============================================================================================================================#
 
@@ -26,8 +27,8 @@ class EmbedTemplate(GenericModel, Generic[_VT]):
     thumbnail_url: str = None
     image_url: str = None
     footer: tuple[str, str | None] = None
-    description: str | Callable[[_VT, int], str] = None
-    fields: Callable[[_VT, int], tuple[str, str, bool]] = None
+    description: str | Callable[[_Item_VT, int], str] = None
+    fields: Callable[[_Item_VT, int], tuple[str, str, bool]] = None
 
     separator: str = "\n"
 
@@ -47,25 +48,25 @@ class EmbedTemplate(GenericModel, Generic[_VT]):
         pass
 
     @overload
-    def _get_value(self, key: Literal["description"], item: _VT , index: int) -> str | None:
+    def _get_value(self, key: Literal["description"], item: _Item_VT , index: int) -> str | None:
         pass
 
     @overload
-    def _get_value(self, key: Literal["fields"], item: _VT , index: int) -> tuple[str, str, bool] | None:
+    def _get_value(self, key: Literal["fields"], item: _Item_VT , index: int) -> tuple[str, str, bool] | None:
         pass
 
     @overload
     def _get_value(self, key: Literal["title", "url", "thumbnail_url", "image_url"]) -> str | None:
         pass
 
-    def _get_value(self, key: str, item: _VT = None, index: int = 0) -> str | discord.Colour | tuple | None:
+    def _get_value(self, key: str, item: _Item_VT = None, index: int = 0) -> str | discord.Colour | tuple | None:
         v = getattr(self, key)
         if callable(v):
             return v(item, index)
         else:
             return v
 
-    def __call__(self, items: list[_VT], first_index: int) -> discord.Embed:
+    def __call__(self, items: list[_Item_VT], first_index: int) -> discord.Embed:
         embed = discord.Embed(
             title = self._get_value("title"),
             url = self._get_value("url"),
@@ -86,8 +87,8 @@ class EmbedTemplate(GenericModel, Generic[_VT]):
             description = self.separator.join(desc_list)
             embed.description = description
 
-        embed.set_thumbnail(self._get_value("thumbnail_url"))
-        embed.set_image(self._get_value("image_url"))
+        embed.set_thumbnail(url = self._get_value("thumbnail_url"))
+        embed.set_image(url = self._get_value("image_url"))
 
         author = self._get_value("author")
         if author:
@@ -101,16 +102,18 @@ class EmbedTemplate(GenericModel, Generic[_VT]):
 
         return embed
 
+EmbedTemplate.update_forward_refs()
+
 #=============================================================================================================================#
 
 class Item(GenericModel, Generic[_VT]):
     value: _VT
-    children: list["Item"] = []
+    children: list[_Item_VT] = []
 
     class Config:
         arbitrary_types_allowed = True
 
-    def __getitem__(self, key: int | tuple[int]) -> "Item[_VT]":
+    def __getitem__(self, key: int | tuple[int]) -> _Item_VT:
         if isinstance(key, int):
             return self.children[key]
         else:
@@ -119,16 +122,17 @@ class Item(GenericModel, Generic[_VT]):
             else:
                 return self.children[key[0]][key[1:]]
 
+Item.update_forward_refs()
+
 #=============================================================================================================================#
 
 class SingleRowPaginator(Generic[_VT]):
     queue: asyncio.Queue[tuple[Interaction, _VT]]
     items: list[Item[_VT]]
+    page_size: int
     pages: list[tuple[Item[_VT], ...]]
     page_amount: int
     current_index: int
-
-    PAGE_SIZE = 20
 
     class PaginatorView(StandardView):
         paginator: "SingleRowPaginator[_VT]"
@@ -199,24 +203,25 @@ class SingleRowPaginator(Generic[_VT]):
     class PaginatorTemplate(EmbedTemplate[_VT]):
         pass
 
-    def __init__(self, items: Item | list[Item[_VT]]):
+    def __init__(self, items: Item[_VT] | list[Item[_VT]], *, page_size = 20):
         if isinstance(items, Item):
             self.items = items.children
         else:
             self.items = items
 
-        self.pages = list(utils.grouper(self.items, self.PAGE_SIZE, incomplete = "missing"))
+        self.page_size = page_size
+        self.pages = list(utils.grouper(self.items, page_size, incomplete = "missing"))
         self.page_amount = len(self.pages)
         self.current_index = 0
         self.queue = asyncio.Queue()
 
     def render(self, *, allowed_user: discord.User, timeout: int | float = 180.0) -> tuple[discord.Embed, View]:
         current_items = self.pages[self.current_index]
-        current_first_index = self.PAGE_SIZE * self.current_index
+        current_first_index = self.page_size * self.current_index
 
         template = self.PaginatorTemplate()
         if template.description is None:
-            template.description = lambda item, index: f"{index + 1}. {item}"
+            template.description = lambda item, index: f"{index + 1}. {item.value}"
         embed = template(current_items, current_first_index)
 
         view = self.PaginatorView(allowed_user = allowed_user, timeout = timeout)
@@ -244,9 +249,9 @@ class SingleRowPaginator(Generic[_VT]):
 
         return embed, view
 
-    async def setup(self, interaction: Interaction, *, timeout: int | float = 180.0):
-        view = self.render(allowed_user = interaction.user, timeout = timeout)
-        asyncio.create_task(interaction.response.send_message(view = view))
+    async def setup(self, interaction: Interaction, *, timeout: int | float = 180.0) -> AsyncGenerator[tuple[Interaction, _VT]]:
+        embed, view = self.render(allowed_user = interaction.user, timeout = timeout)
+        asyncio.create_task(interaction.response.send_message(embed = embed, view = view))
         while True:
             try:
                 interaction, value = await asyncio.wait_for(self.queue.get(), timeout = view.timeout)
