@@ -1,7 +1,7 @@
 import discord
 from discord import ui
 import io
-from typing import Awaitable
+from typing import Awaitable, TypeVar
 from typing_extensions import Self
 from collections.abc import Callable
 
@@ -26,23 +26,24 @@ class Interaction(discord.Interaction):
         """:class:`Client`: The client that is handling this interaction."""
         return self._client
 
-class _AddCallbackMixin:
-    def add_callback(self, callback: Callable[[Interaction], Awaitable]):
-        self.callback = callback
-
-class View(_AddCallbackMixin, ui.View):
+class View(ui.View):
     async def on_timeout(self) -> None:
         self.stop()
 
-class Modal(_AddCallbackMixin, ui.Modal):
+class Modal(ui.Modal):
     async def on_timeout(self) -> None:
         self.stop()
 
-class Button(_AddCallbackMixin, ui.Button[View]):
+_V = TypeVar("_V", bound = View, covariant = True)
+
+class Item(ui.Item[_V]):
     pass
 
-class Select(_AddCallbackMixin, ui.Select[View]):
+class Button(ui.Button[_V]):
     pass
 
-class TextInput(_AddCallbackMixin, ui.TextInput[View]):
+class Select(ui.Select[_V]):
+    pass
+
+class TextInput(ui.TextInput[_V]):
     pass

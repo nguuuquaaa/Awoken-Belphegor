@@ -2,15 +2,18 @@ import discord
 from discord import ui
 from discord.utils import MISSING
 from collections.abc import AsyncGenerator
-from typing_extensions import Self
+from typing import TypeVar
 import asyncio
 
-from belphegor.ext_types import Select
+from belphegor.ext_types import Select, View
 from belphegor.utils import copy_signature
 from .metas import BaseItem
 
 #=============================================================================================================================#
 
-@copy_signature(Select)
-class BaseSelect(BaseItem, Select):
-    pass
+_V = TypeVar("_V", bound = View)
+
+class BaseSelect(BaseItem, Select[_V]):
+    @copy_signature(Select.__init__)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)

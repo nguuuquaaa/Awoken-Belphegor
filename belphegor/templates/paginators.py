@@ -7,7 +7,7 @@ import asyncio
 from pydantic.generics import GenericModel
 
 from belphegor import utils
-from belphegor.ext_types import Interaction, View, Select
+from belphegor.ext_types import Interaction, View, Item
 from .views import StandardView
 from .buttons import NextButton, PreviousButton, JumpForwardButton, JumpBackwardButton, JumpToButton
 from .selects import BaseSelect
@@ -15,7 +15,7 @@ from .selects import BaseSelect
 #=============================================================================================================================#
 
 _VT = TypeVar("_VT")
-_Item_VT = ForwardRef("Item[_VT]")
+_PageItem_VT = ForwardRef("PageItem[_VT]")
 
 #=============================================================================================================================#
 
@@ -27,8 +27,8 @@ class EmbedTemplate(GenericModel, Generic[_VT]):
     thumbnail_url: str = None
     image_url: str = None
     footer: tuple[str, str | None] = None
-    description: str | Callable[[_Item_VT, int], str] = None
-    fields: Callable[[_Item_VT, int], tuple[str, str, bool]] = None
+    description: str | Callable[[_PageItem_VT, int], str] = None
+    fields: Callable[[_PageItem_VT, int], tuple[str, str, bool]] = None
 
     separator: str = "\n"
 
@@ -48,25 +48,25 @@ class EmbedTemplate(GenericModel, Generic[_VT]):
         pass
 
     @overload
-    def _get_value(self, key: Literal["description"], item: _Item_VT , index: int) -> str | None:
+    def _get_value(self, key: Literal["description"], item: _PageItem_VT , index: int) -> str | None:
         pass
 
     @overload
-    def _get_value(self, key: Literal["fields"], item: _Item_VT , index: int) -> tuple[str, str, bool] | None:
+    def _get_value(self, key: Literal["fields"], item: _PageItem_VT , index: int) -> tuple[str, str, bool] | None:
         pass
 
     @overload
     def _get_value(self, key: Literal["title", "url", "thumbnail_url", "image_url"]) -> str | None:
         pass
 
-    def _get_value(self, key: str, item: _Item_VT = None, index: int = 0) -> str | discord.Colour | tuple | None:
+    def _get_value(self, key: str, item: _PageItem_VT = None, index: int = 0) -> str | discord.Colour | tuple | None:
         v = getattr(self, key)
         if callable(v):
             return v(item, index)
         else:
             return v
 
-    def __call__(self, items: list[_Item_VT], first_index: int) -> discord.Embed:
+    def __call__(self, items: list[_PageItem_VT], first_index: int) -> discord.Embed:
         embed = discord.Embed(
             title = self._get_value("title"),
             url = self._get_value("url"),
@@ -106,14 +106,14 @@ EmbedTemplate.update_forward_refs()
 
 #=============================================================================================================================#
 
-class Item(GenericModel, Generic[_VT]):
+class PageItem(GenericModel, Generic[_VT]):
     value: _VT
-    children: list[_Item_VT] = []
+    children: list[_PageItem_VT] = []
 
     class Config:
         arbitrary_types_allowed = True
 
-    def __getitem__(self, key: int | tuple[int]) -> _Item_VT:
+    def __getitem__(self, key: int | tuple[int]) -> _PageItem_VT:
         if isinstance(key, int):
             return self.children[key]
         else:
@@ -122,15 +122,15 @@ class Item(GenericModel, Generic[_VT]):
             else:
                 return self.children[key[0]][key[1:]]
 
-Item.update_forward_refs()
+PageItem.update_forward_refs()
 
 #=============================================================================================================================#
 
 class SingleRowPaginator(Generic[_VT]):
     queue: asyncio.Queue[tuple[Interaction, _VT]]
-    items: list[Item[_VT]]
+    items: list[PageItem[_VT]]
     page_size: int
-    pages: list[tuple[Item[_VT], ...]]
+    pages: list[tuple[PageItem[_VT], ...]]
     page_amount: int
     current_index: int
 
@@ -140,40 +140,40 @@ class SingleRowPaginator(Generic[_VT]):
         class _HasPaginatorMixin:
             paginator: "SingleRowPaginator[_VT]"
 
-        class PaginatorNextButton(NextButton, _HasPaginatorMixin):
+        class PaginatorNextButton(NextButton["SingleRowPaginator.PaginatorView"], _HasPaginatorMixin):
             async def callback(self, interaction: Interaction):
                 paginator = self.paginator
                 paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + 1)
                 embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
                 await interaction.response.edit_message(embed = embed, view = view)
 
-        class PaginatorPreviousButton(PreviousButton, _HasPaginatorMixin):
+        class PaginatorPreviousButton(PreviousButton["SingleRowPaginator.PaginatorView"], _HasPaginatorMixin):
             async def callback(self, interaction: Interaction):
                 paginator = self.paginator
                 paginator.current_index = max(0, paginator.current_index - 1)
                 embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
                 await interaction.response.edit_message(embed = embed, view = view)
 
-        class PaginatorJumpForwardButton(JumpForwardButton, _HasPaginatorMixin):
+        class PaginatorJumpForwardButton(JumpForwardButton["SingleRowPaginator.PaginatorView"], _HasPaginatorMixin):
             async def callback(self, interaction: Interaction):
                 paginator = self.paginator
                 paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + self.jump)
                 embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
                 await interaction.response.edit_message(embed = embed, view = view)
 
-        class PaginatorJumpBackwardButton(JumpBackwardButton, _HasPaginatorMixin):
+        class PaginatorJumpBackwardButton(JumpBackwardButton["SingleRowPaginator.PaginatorView"], _HasPaginatorMixin):
             async def callback(self, interaction: Interaction):
                 paginator = self.paginator
                 paginator.current_index = max(0, paginator.current_index - self.jump)
                 embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
                 await interaction.response.edit_message(embed = embed, view = view)
 
-        class PaginatorJumpToButton(JumpToButton, _HasPaginatorMixin):
+        class PaginatorJumpToButton(JumpToButton["SingleRowPaginator.PaginatorView"], _HasPaginatorMixin):
             async def callback(self, interaction: Interaction):
                 paginator = self.paginator
                 asyncio.create_task(interaction.response.send_modal(self.create_modal()))
                 try:
-                    interaction, text_input = await asyncio.wait_for(paginator.queue.get(), timeout = self.view.timeout)
+                    interaction, text_input = await asyncio.wait_for(self.queue.get(), timeout = self.view.timeout)
                 except asyncio.TimeoutError:
                     return
 
@@ -186,7 +186,7 @@ class SingleRowPaginator(Generic[_VT]):
                     embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
                     await interaction.response.edit_message(embed = embed, view = view)
 
-        class PaginatorSelect(BaseSelect, _HasPaginatorMixin):
+        class PaginatorSelect(BaseSelect["SingleRowPaginator.PaginatorView"], _HasPaginatorMixin):
             placeholder = "Select"
             min_values = 1
             max_values = 1
@@ -195,7 +195,14 @@ class SingleRowPaginator(Generic[_VT]):
                 values = self.values
                 await self.paginator.queue.put((interaction, values[0]))
 
-        def add_item(self, item: ui.Item) -> Self:
+            def add_items_as_options(self, items: list[PageItem[_VT]], current_index: int):
+                for i, item in enumerate(items):
+                    self.add_option(
+                        label = f"{i + current_index + 1}. {item.value}",
+                        value = item.value
+                    )
+
+        def add_item(self, item: Item) -> Self:
             item.paginator = self.paginator
             super().add_item(item)
             return self
@@ -203,8 +210,8 @@ class SingleRowPaginator(Generic[_VT]):
     class PaginatorTemplate(EmbedTemplate[_VT]):
         pass
 
-    def __init__(self, items: Item[_VT] | list[Item[_VT]], *, page_size = 20):
-        if isinstance(items, Item):
+    def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]], *, page_size = 20):
+        if isinstance(items, PageItem):
             self.items = items.children
         else:
             self.items = items
@@ -234,11 +241,7 @@ class SingleRowPaginator(Generic[_VT]):
         jump_to_button = self.PaginatorView.PaginatorJumpToButton(label = f"Page {self.current_index + 1} of {self.page_amount}", row = 1)
 
         select = self.PaginatorView.PaginatorSelect(row = 0)
-        for i, item in enumerate(current_items):
-            select.add_option(
-                label = f"{i + current_first_index + 1}. {item.value}",
-                value = item.value
-            )
+        select.add_items_as_options(current_items, current_first_index)
 
         view.add_item(select)
         view.add_item(jump_backward_button)
@@ -259,39 +262,3 @@ class SingleRowPaginator(Generic[_VT]):
                 return
             else:
                 yield interaction, value
-
-
-# class DeepSelector(StandardView):
-#     MAX_DEPTH = 3
-
-#     items: Item
-#     depth: int
-#     current_index: tuple[int, ...]
-
-#     def __init__(self, items: Item | list[Item], depth: Annotated[int, 1, MAX_DEPTH] = 1, *, timeout: float | int = 180):
-#         super().__init__(timeout = timeout)
-#         if isinstance(items, Item):
-#             self.items = items
-#         else:
-#             self.items = Item(value = None, children = items)
-#         self.depth = depth
-#         self.current_index = ()
-
-#     def render(self):
-#         for i in range(min(len(self.current_index) + 1, self.MAX_DEPTH)):
-#             item = self.items[self.current_index[:i]]
-#             current_len = len(item.children)
-
-#             jump_backward_button = JumpBackwardButton(row = i)
-#             previous_button = PreviousButton(row = i)
-#             next_button = NextButton(row = i)
-#             jump_forward_button = JumpForwardButton(row = i)
-
-#             self.add_item(jump_backward_button)
-#             self.add_item(previous_button)
-#             self.add_item(next_button)
-#             self.add_item(jump_forward_button)
-
-#             @jump_backward_button.add_callback
-#             async def callback(interaction: Interaction):
-

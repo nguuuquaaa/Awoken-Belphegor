@@ -1,12 +1,11 @@
 import discord
 from discord import ui
 import asyncio
-from collections.abc import Callable, Sequence, AsyncGenerator
-from typing import TypeAlias, ClassVar
+from collections.abc import AsyncGenerator
 from typing_extensions import Self
 
-from belphegor.ext_types import Interaction, View, Modal, TextInput
-from .buttons import InputButton, ExitButton
+from belphegor.ext_types import Interaction, View, TextInput
+from .buttons import InputButton as OrigInputButton, ExitButton
 from belphegor.utils import copy_signature
 
 #=============================================================================================================================#
@@ -42,7 +41,9 @@ class StandardView(View):
 #=============================================================================================================================#
 
 class ContinuousInputView(StandardView):
-    class InputButton(InputButton):
+    input_button: "InputButton"
+
+    class InputButton(OrigInputButton["ContinuousInputView"]):
         pass
 
     def __init__(self, *, timeout: int | float = 180.0, allowed_user: discord.User = None):
