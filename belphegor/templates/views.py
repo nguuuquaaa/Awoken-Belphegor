@@ -2,15 +2,16 @@ import discord
 from discord import ui
 import asyncio
 from collections.abc import AsyncGenerator
+from typing import TypeVar, ForwardRef
 from typing_extensions import Self
 
-from belphegor.ext_types import Interaction, View, TextInput
-from .buttons import InputButton as OrigInputButton, ExitButton
+from belphegor.ext_types import Interaction
 from belphegor.utils import copy_signature
+from .buttons import InputButton as OrigInputButton, ExitButton
 
 #=============================================================================================================================#
 
-class StandardView(View):
+class StandardView(ui.View):
     allowed_user: discord.User
     already_sent: bool
 
@@ -29,7 +30,6 @@ class StandardView(View):
         else:
             return interaction.user == self.allowed_user
 
-    @copy_signature(discord.InteractionResponse.send_message)
     async def response_to(self, interaction: Interaction, **kwargs):
         kwargs.pop("view", None)
         if self.already_sent:
@@ -40,10 +40,12 @@ class StandardView(View):
 
 #=============================================================================================================================#
 
+_CV = TypeVar("_CV", bound = ForwardRef("ContinuousInputView"))
+
 class ContinuousInputView(StandardView):
     input_button: "InputButton"
 
-    class InputButton(OrigInputButton["ContinuousInputView"]):
+    class InputButton(OrigInputButton[_CV]):
         pass
 
     def __init__(self, *, timeout: int | float = 180.0, allowed_user: discord.User = None):
@@ -52,7 +54,7 @@ class ContinuousInputView(StandardView):
         self.add_item(self.input_button)
         self.add_exit_button()
 
-    async def setup(self, interaction: Interaction) -> AsyncGenerator[tuple[Interaction, TextInput]]:
+    async def setup(self, interaction: Interaction) -> AsyncGenerator[tuple[Interaction, ui.TextInput]]:
         modal = self.input_button.create_modal()
         asyncio.create_task(interaction.response.send_modal(modal))
         async for interaction, input in self.input_button.wait_for_inputs():

@@ -8,12 +8,18 @@ import textwrap
 import asyncio
 from io import StringIO
 from contextlib import redirect_stdout
+import os
 
 from belphegor.bot import Belphegor
 from belphegor.ext_types.discord_types import Interaction
-from belphegor.templates.views import ContinuousInputView
+from belphegor.templates.buttons import BaseButton, EmojiType
+from belphegor.templates.views import ContinuousInputView, StandardView
 from belphegor.templates.checks import Check
 from belphegor import utils
+
+#=============================================================================================================================#
+
+all_extensions = [fn[:-4] for fn in os.listdir("./belphegor/extensions") if fn.endswith(".py") and not fn.startswith("_")]
 
 #=============================================================================================================================#
 
@@ -23,24 +29,36 @@ class Admin(commands.Cog):
 
     @ac.command(name = "reload")
     @ac.describe(extension = "Extension to reload")
+    @ac.choices(extension = [ac.Choice(name = e, value = e) for e in all_extensions])
     @ac.check(Check.owner_only())
     async def reload(
         self,
         interaction: Interaction,
         extension: str
     ):
-        fullname_extension = f"belphegor.cogs.{extension}"
-        try:
-            if fullname_extension in self.bot.extensions:
-                await self.bot.reload_extension(fullname_extension)
-            else:
-                await self.bot.load_extension(fullname_extension)
-        except commands.ExtensionError:
-            await interaction.response.send_message(f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```")
-        else:
-            await self.bot.tree.sync()
-            print(f"Reloaded {fullname_extension}")
-            await interaction.response.send_message(f"```\nSuccess reloading {extension}```")
+        class ReloadButton(BaseButton[StandardView]):
+            label: str = f"Reload {extension}"
+            emoji: EmojiType = "\U0001f504"
+            style: enums.ButtonStyle = enums.ButtonStyle.primary
+
+            async def callback(self, interaction: Interaction):
+                fullname_extension = f"belphegor.extensions.{extension}"
+                try:
+                    if fullname_extension in interaction.client.extensions:
+                        await interaction.client.reload_extension(fullname_extension)
+                    else:
+                        await interaction.client.load_extension(fullname_extension)
+                except commands.ExtensionError:
+                    await self.view.response_to(interaction, content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```")
+                else:
+                    interaction.client.log.info(f"Reloaded {fullname_extension}")
+                    await self.view.response_to(interaction, content = f"```\nSuccess reloading {extension}```")
+
+        view = StandardView()
+        reload_button = ReloadButton()
+        view.add_item(reload_button)
+        view.add_exit_button()
+        await reload_button.callback(interaction)
 
     @ac.command(name = "reimport")
     @ac.describe(module = "Module to reimport")

@@ -17,6 +17,15 @@ class Check:
         return predicate
 
     @staticmethod
+    def any(*checks: Callable):
+        async def predicate(interaction: Interaction):
+            for check in checks:
+                if await check(interaction):
+                    return True
+            return False
+        return predicate
+
+    @staticmethod
     def user_only(user: discord.User) -> Callable:
         async def predicate(interaction: Interaction):
             return interaction.user == user
@@ -26,4 +35,10 @@ class Check:
     def owner_only():
         async def predicate(interaction: Interaction):
             return interaction.user.id == interaction.client.owner_id
+        return predicate
+
+    @staticmethod
+    def guild_manager_only():
+        async def predicate(interaction: Interaction):
+            return interaction.user.guild_permissions.manage_guild
         return predicate

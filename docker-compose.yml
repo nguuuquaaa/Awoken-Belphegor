@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  bel:
+    image: nguuuquaaa/belphegor:latest
+    command: py3.10 _dumb.py
+    restart: always
+    environment:
+      - LOGGER=belphegor
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - .:/bel
+    working_dir: /bel
+
+  db:
+    image: mongo:latest
+    restart: always
+    volumes:
+      - data/db:/data/db
+    ports:
+      - "27017:27017"

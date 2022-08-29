@@ -1,5 +1,8 @@
-venv/*
+venv
 _*
 .env
-.env.test
+test.*
 *.code-workspace
+docker-compose.test.yml
+data/db
+logs

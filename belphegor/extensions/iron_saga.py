@@ -9,14 +9,14 @@ import re
 from functools import partial
 
 from belphegor.bot import Belphegor
-from belphegor.ext_types import Interaction, View
+from belphegor.ext_types import Interaction
 from belphegor.templates.views import StandardView
 from belphegor.templates.buttons import BaseButton, TriviaButton, SkinsButton
 from belphegor.templates.selects import BaseSelect
 from belphegor.templates.paginators import SingleRowPaginator, PageItem
 from belphegor.utils import CircleIter, grouper
 
-#==================================================================================================================================================
+#=============================================================================================================================#
 
 ISWIKI_BASE = "https://ironsaga.fandom.com"
 ISWIKI_API = f"{ISWIKI_BASE}/api.php"
@@ -247,13 +247,12 @@ class IronSaga(commands.Cog):
             pilots[doc["en_name"]] = Pilot(**doc)
 
         if len(pilots) == 0:
-            return await interaction.response.send_message(f"Can't find any pilot with name {name}")
+            return await interaction.response.send_message(f"Can't find any pilot with name: {name}")
 
         if len(pilots) > 1:
             class PilotPaginator(SingleRowPaginator):
-                class PaginatorView(SingleRowPaginator.PaginatorView):
-                    class PaginatorSelect(SingleRowPaginator.PaginatorView.PaginatorSelect):
-                        placeholder = "Select pilot"
+                class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
+                    placeholder = "Select pilot"
 
                 class PaginatorTemplate(SingleRowPaginator.PaginatorTemplate):
                     title = f"Found {len(pilots)} pilots"

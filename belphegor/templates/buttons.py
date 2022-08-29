@@ -1,31 +1,37 @@
 import discord
-from discord import ui
+from discord.ui import Button, View, Modal, TextInput
 from discord.enums import ButtonStyle
 from discord.utils import MISSING
 from collections.abc import AsyncGenerator
-from typing import TypeVar
+from typing import TypeVar, TypeAlias
 from typing_extensions import Self
 import asyncio
 from functools import cached_property
+from pydantic import Field, BaseModel
 
-from belphegor.ext_types import Interaction, Button, View, Modal, TextInput
-from belphegor.utils import copy_signature
+from belphegor.ext_types import Interaction
 from .metas import BaseItem
 
 #=============================================================================================================================#
 
 _V = TypeVar("_V", bound = View, covariant = True)
 
+EmojiType: TypeAlias = str | discord.Emoji | discord.PartialEmoji
+
 class BaseButton(BaseItem, Button[_V]):
-    @copy_signature(Button.__init__)
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    label: str = None
+    emoji: EmojiType = None
+    style: ButtonStyle = ButtonStyle.secondary
+    url: str = None
+    row: int = None
+    custom_id: str = None
+    disabled: bool = False
 
 class InputButton(BaseButton[_V]):
-    label = "Input"
-    emoji = "\U0001f4dd"
-    style = ButtonStyle.primary
-    queue: asyncio.Queue[tuple[Interaction, TextInput[_V]]]
+    label: str = "Input"
+    emoji: EmojiType = "\U0001f4dd"
+    style: ButtonStyle = ButtonStyle.primary
+    queue: asyncio.Queue[tuple[Interaction, TextInput[_V]]] = Field(init = False)
 
     class InputModal(Modal, title = "Input"):
         view: _V
@@ -39,9 +45,7 @@ class InputButton(BaseButton[_V]):
         async def on_submit(self, interaction: Interaction):
             await self.queue.put((interaction, self.input))
 
-    @copy_signature(BaseButton.__init__)
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __post_init__(self):
         self.queue = asyncio.Queue()
 
     def create_modal(self, *, title: str = MISSING, custom_id: str = MISSING) -> InputModal:
@@ -64,14 +68,14 @@ class InputButton(BaseButton[_V]):
                 yield interaction, text_input
 
 class HomeButton(BaseButton[_V]):
-    label = "Home"
-    emoji = "\U0001f3e0"
-    style = ButtonStyle.primary
+    label: str = "Home"
+    emoji: EmojiType = "\U0001f3e0"
+    style: ButtonStyle = ButtonStyle.primary
 
 class ExitButton(BaseButton[_V]):
-    label = "Exit"
-    emoji = "\u274c"
-    style = ButtonStyle.secondary
+    label: str = "Exit"
+    emoji: EmojiType = "\u274c"
+    style: ButtonStyle = ButtonStyle.secondary
 
     async def callback(self, interaction: Interaction):
         view = self.view
@@ -82,44 +86,44 @@ class ExitButton(BaseButton[_V]):
         await interaction.response.edit_message(view = view)
 
 class ConfirmedButton(BaseButton[_V]):
-    label = None
-    emoji = "\u2705"
-    style = ButtonStyle.secondary
+    label: str = None
+    emoji: EmojiType = "\u2705"
+    style: ButtonStyle = ButtonStyle.secondary
 
 class DeniedButton(BaseButton[_V]):
-    label = None
-    emoji = "\u2716"
-    style = ButtonStyle.secondary
+    label: str = None
+    emoji: EmojiType = "\u2716"
+    style: ButtonStyle = ButtonStyle.secondary
 
 #=============================================================================================================================#
 
 class NextButton(BaseButton[_V]):
-    label = None
-    emoji = "\u25b6"
-    style = ButtonStyle.secondary
+    label: str = None
+    emoji: EmojiType = "\u25b6"
+    style: ButtonStyle = ButtonStyle.secondary
 
 class PreviousButton(BaseButton[_V]):
-    label = None
-    emoji = "\u25c0"
-    style = ButtonStyle.secondary
+    label: str = None
+    emoji: EmojiType = "\u25c0"
+    style: ButtonStyle = ButtonStyle.secondary
 
 class JumpForwardButton(BaseButton[_V]):
-    jump = 5
-    label = f"Forward {jump}"
-    emoji = "\u23e9"
-    style = ButtonStyle.secondary
+    jump: int = 5
+    label: str = f"Forward {jump}"
+    emoji: EmojiType = "\u23e9"
+    style: ButtonStyle = ButtonStyle.secondary
 
 class JumpBackwardButton(BaseButton[_V]):
-    jump = 5
-    label = f"Back {jump}"
-    emoji = "\u23ea"
-    style = ButtonStyle.secondary
+    jump: int = 5
+    label: str = f"Back {jump}"
+    emoji: EmojiType = "\u23ea"
+    style: ButtonStyle = ButtonStyle.secondary
 
 class JumpToButton(InputButton[_V]):
-    label = "Jump to"
-    emoji = "\u23fa"
-    style = ButtonStyle.secondary
-    queue: asyncio.Queue[tuple[Interaction, "InputModal.IntTextInput[_V]"]]
+    label: str = "Jump to"
+    emoji: EmojiType = "\u23fa"
+    style: ButtonStyle = ButtonStyle.secondary
+    queue: asyncio.Queue[tuple[Interaction, "InputModal.IntTextInput[_V]"]] = Field(init = False)
 
     class InputModal(InputButton.InputModal):
         queue: asyncio.Queue[tuple[Interaction, "IntTextInput[_V]"]]
@@ -151,11 +155,11 @@ class JumpToButton(InputButton[_V]):
 #=============================================================================================================================#
 
 class TriviaButton(BaseButton[_V]):
-    label = "Trivia"
-    emoji = "\U0001f5d2"
-    style = ButtonStyle.primary
+    label: str = "Trivia"
+    emoji: EmojiType = "\U0001f5d2"
+    style: ButtonStyle = ButtonStyle.primary
 
 class SkinsButton(BaseButton[_V]):
-    label = "Skins"
-    emoji = "\U0001f5bc"
-    style = ButtonStyle.primary
+    label: str = "Skins"
+    emoji: EmojiType = "\U0001f5bc"
+    style: ButtonStyle = ButtonStyle.primary

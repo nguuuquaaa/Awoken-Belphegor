@@ -1,5 +1,5 @@
 import discord
-from discord import app_commands as ac
+from discord import app_commands as ac, ui
 from discord.enums import ButtonStyle, TextStyle
 from discord.ext import commands
 import asyncio
@@ -8,7 +8,7 @@ import time
 import io
 
 from belphegor.bot import Belphegor
-from belphegor.ext_types import Interaction, TextInput
+from belphegor.ext_types import Interaction
 from belphegor.templates.buttons import InputButton
 from belphegor.templates.views import StandardView, ContinuousInputView
 from .misc_core import calculator
@@ -21,6 +21,18 @@ BOX_PATTERN = {
     (1, 0): "\u2580",
     (1, 1): "\u2588"
 }
+
+#=============================================================================================================================#
+
+class MathView(ContinuousInputView):
+    class InputButton(ContinuousInputView.InputButton):
+        class InputModal(ContinuousInputView.InputButton.InputModal):
+            input = ui.TextInput(
+                label = "Input formulas",
+                style = TextStyle.long,
+                min_length = 1,
+                max_length = 1000
+            )
 
 #=============================================================================================================================#
 
@@ -71,16 +83,6 @@ class Misc(commands.Cog):
         interaction: Interaction
     ):
         m = calculator.MathParse()
-
-        class MathView(ContinuousInputView):
-            class InputButton(ContinuousInputView.InputButton):
-                class InputModal(ContinuousInputView.InputButton.InputModal):
-                    input = TextInput(
-                        label = "Input formulas",
-                        style = TextStyle.long,
-                        min_length = 1,
-                        max_length = 1000
-                    )
 
         view = MathView(allowed_user = interaction.user)
         async for interaction, input in view.setup(interaction):

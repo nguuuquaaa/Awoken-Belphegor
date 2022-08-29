@@ -23,27 +23,5 @@ class File(discord.File):
 class Interaction(discord.Interaction):
     @property
     def client(self) -> Belphegor:
-        """:class:`Client`: The client that is handling this interaction."""
+        """:class:`Belphegor`: The client that is handling this interaction."""
         return self._client
-
-class View(ui.View):
-    async def on_timeout(self) -> None:
-        self.stop()
-
-class Modal(ui.Modal):
-    async def on_timeout(self) -> None:
-        self.stop()
-
-_V = TypeVar("_V", bound = View, covariant = True)
-
-class Item(ui.Item[_V]):
-    pass
-
-class Button(ui.Button[_V]):
-    pass
-
-class Select(ui.Select[_V]):
-    pass
-
-class TextInput(ui.TextInput[_V]):
-    pass
