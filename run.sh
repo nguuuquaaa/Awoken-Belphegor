@@ -1,2 +1,2 @@
-PYTHONDONTWRITEBYTECODE=1
-python3.10 run.py
+docker-compose down -v --remove-orphans
+docker-compose up --d

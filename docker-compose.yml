@@ -3,7 +3,7 @@ version: '3.8'
 services:
   bel:
     image: nguuuquaaa/belphegor:latest
-    command: py3.10 _dumb.py
+    command: py3.10 run.py
     restart: always
     environment:
       - LOGGER=belphegor

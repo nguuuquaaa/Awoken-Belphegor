@@ -1,7 +1,7 @@
-## tl;dr: Belphegor will switch to slash commands at the end of April
+## tl;dr: Belphegor will switch to slash commands at the end of ~~April~~ August
 
 
-So by the end of April, all bots will be required message intent or some sort to send normal messages for commands, *or* just go slash commands and YOLO. Since discord explicitly disapproves of using message intent for bot commands (iirc), slash commands is the only choice left.
+So by the end of ~~April~~ August, all bots will be required message intent or some sort to send normal messages for commands, *or* just go slash commands and YOLO. Since discord explicitly disapproves of using message intent for bot commands (iirc), slash commands is the only choice left.
 
 So I'll do that.
 
@@ -12,7 +12,7 @@ It's now `/say` -> select Belphegor from the list of 412412984565464 bots with t
 Since these slash commands have different interface than message commands, I will need a lot of rewriting to process, so may as well remake Belphegor from scratch (holy shit) (actually I'll still copy old codes over so it's not exactly *from scratch*).
 
 So here's the plan for now:
-1. Since Otogi is already EoS, may as well not keep the commands anymore. The bot name/avatar and old repo is enough to remind everyone of the game.
+1. ~~Since Otogi is already EoS, may as well not keep the commands anymore. The bot name/avatar and old repo is enough to remind everyone of the game.~~ Actually it's kinda revived so I can just port over I guess.
 2. Server management, tags/stickers (this sticker is different from discord sticker, as it exists long before), and random images will be removed due to low usage.
 3. No more PSO2 EQ alert, as it's better to go to ARKS Fleet server and follow the EQ alert channel. Also no more item/price search since pso-hack had been down for a long while.
 4. The weapons/units search (which is the only one left of PSO2) will proooobably be kept (need to stop procrastination ugh)
