@@ -9,6 +9,8 @@ import asyncio
 from io import StringIO
 from contextlib import redirect_stdout
 import os
+import typing
+import enum
 
 from belphegor.bot import Belphegor
 from belphegor.ext_types.discord_types import Interaction
@@ -19,7 +21,10 @@ from belphegor import utils
 
 #=============================================================================================================================#
 
-all_extensions = [fn[:-4] for fn in os.listdir("./belphegor/extensions") if fn.endswith(".py") and not fn.startswith("_")]
+log = utils.get_logger()
+all_extensions = [fn[:-3] for fn in os.listdir("./belphegor/extensions") if fn.endswith(".py")]
+log.debug(f"all extensions: {', '.join(all_extensions)}")
+ExtensionChoice = enum.Enum("ExtensionChoice", all_extensions)
 
 #=============================================================================================================================#
 
@@ -29,13 +34,14 @@ class Admin(commands.Cog):
 
     @ac.command(name = "reload")
     @ac.describe(extension = "Extension to reload")
-    @ac.choices(extension = [ac.Choice(name = e, value = e) for e in all_extensions])
     @ac.check(Check.owner_only())
     async def reload(
         self,
         interaction: Interaction,
-        extension: str
+        extension: ExtensionChoice
     ):
+        extension = extension.name
+
         class ReloadButton(BaseButton[StandardView]):
             label: str = f"Reload {extension}"
             emoji: EmojiType = "\U0001f504"
@@ -49,10 +55,10 @@ class Admin(commands.Cog):
                     else:
                         await interaction.client.load_extension(fullname_extension)
                 except commands.ExtensionError:
-                    await self.view.response_to(interaction, content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```")
+                    await utils.InteractionHelper.response_to(interaction, content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```", view = self.view)
                 else:
-                    interaction.client.log.info(f"Reloaded {fullname_extension}")
-                    await self.view.response_to(interaction, content = f"```\nSuccess reloading {extension}```")
+                    log.info(f"Reloaded {fullname_extension}")
+                    await utils.InteractionHelper.response_to(interaction, content = f"```\nSuccess reloading {extension}```", view = self.view)
 
         view = StandardView()
         reload_button = ReloadButton()
@@ -101,7 +107,7 @@ class Admin(commands.Cog):
                 embed = discord.Embed()
                 embed.add_field(name = "Input", value = f"```py\n{input.value}\n```", inline = False)
                 embed.add_field(name = "Output", value = f"```py\n{e}\n```", inline = False)
-                await interaction.response.edit_message(embed = embed)
+                await utils.InteractionHelper.response_to(interaction, embed = embed, view = view)
             stdout = StringIO()
             func = env["func"]
             try:
@@ -118,10 +124,22 @@ class Admin(commands.Cog):
                     embed = discord.Embed()
                     embed.add_field(name = "Input", value = f"```py\n{input.value}\n```", inline = False)
                     if len(ret) > 1950:
-                        await interaction.response.edit_message(embed = embed, attachments = [discord.File.from_str(ret, "output.txt")])
+                        await utils.InteractionHelper.response_to(interaction, embed = embed, attachments = [discord.File.from_str(ret, "output.txt")], view = view)
                     elif len(ret) > 0:
                         embed.add_field(name = "Output", value = f"```\n{ret}\n```", inline = False)
-                        await interaction.response.edit_message(embed = embed)
+                        await utils.InteractionHelper.response_to(interaction, embed = embed, view = view)
+
+    @ac.command(name = "sync")
+    @ac.check(Check.owner_only())
+    async def sync(
+        self,
+        interaction: Interaction
+    ):
+        """
+        Sync all commands.
+        """
+        await self.bot.tree.sync(guild = interaction.guild)
+        await interaction.response.send("Synced.")
 
 #=============================================================================================================================#
 

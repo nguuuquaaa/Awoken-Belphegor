@@ -19,22 +19,6 @@ class Help(commands.Cog):
     ):
         pass
 
-    @ac.command(name = "belsync")
-    @ac.check(Check.guild_manager_only())
-    async def belsync(
-        self,
-        interaction: Interaction
-    ):
-        """
-        Sync new commands to this server.
-        """
-        await self.bot.tree.sync(guild = interaction.guild)
-
-    @commands.Cog.listener()
-    async def on_guild_join(self, guild: discord.Guild):
-        self.bot.log.debug(f"guild joined: {guild.id}")
-        await self.bot.tree.sync(guild = guild)
-
 #=============================================================================================================================#
 
 async def setup(bot):
