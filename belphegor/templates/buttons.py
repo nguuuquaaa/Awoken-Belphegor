@@ -9,8 +9,13 @@ import asyncio
 from functools import cached_property
 from pydantic import Field, BaseModel
 
+from belphegor import utils
 from belphegor.ext_types import Interaction
 from .metas import BaseItem
+
+#=============================================================================================================================#
+
+log = utils.get_logger()
 
 #=============================================================================================================================#
 
@@ -19,12 +24,14 @@ _V = TypeVar("_V", bound = View, covariant = True)
 EmojiType: TypeAlias = str | discord.Emoji | discord.PartialEmoji
 
 class BaseButton(BaseItem, Button[_V]):
+    __custom_ui_init_fields__ = ["custom_id", "label", "emoji", "style", "url", "row", "disabled"]
+
+    custom_id: str = None
     label: str = None
     emoji: EmojiType = None
     style: ButtonStyle = ButtonStyle.secondary
     url: str = None
     row: int = None
-    custom_id: str = None
     disabled: bool = False
 
 class InputButton(BaseButton[_V]):
@@ -109,13 +116,13 @@ class PreviousButton(BaseButton[_V]):
 
 class JumpForwardButton(BaseButton[_V]):
     jump: int = 5
-    label: str = f"Forward {jump}"
+    label: str = "Forward 5"
     emoji: EmojiType = "\u23e9"
     style: ButtonStyle = ButtonStyle.secondary
 
 class JumpBackwardButton(BaseButton[_V]):
     jump: int = 5
-    label: str = f"Back {jump}"
+    label: str = "Back 5"
     emoji: EmojiType = "\u23ea"
     style: ButtonStyle = ButtonStyle.secondary
 

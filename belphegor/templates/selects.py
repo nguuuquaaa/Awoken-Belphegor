@@ -1,5 +1,5 @@
 import discord
-from discord import ui
+from discord.ui import Select, View
 from discord.utils import MISSING
 from collections.abc import AsyncGenerator
 from typing import TypeVar
@@ -9,8 +9,15 @@ from .metas import BaseItem
 
 #=============================================================================================================================#
 
-_V = TypeVar("_V", bound = ui.View)
+_V = TypeVar("_V", bound = View)
 
-class BaseSelect(BaseItem, ui.Select[_V]):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+class BaseSelect(BaseItem, Select[_V]):
+    __custom_ui_init_fields__ = ["custom_id", "placeholder", "min_values", "max_values", "options", "row", "disabled"]
+
+    custom_id: str = MISSING
+    placeholder: str = None
+    min_values: int = 1
+    max_values: int = 1
+    options: list[discord.SelectOption] = MISSING
+    row: int = None
+    disabled: bool = False
