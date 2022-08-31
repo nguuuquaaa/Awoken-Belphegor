@@ -1,11 +1,11 @@
 import discord
 from discord import ui
 import io
-from typing import Awaitable, TypeVar
+from typing import Awaitable, TypeVar, TYPE_CHECKING
 from typing_extensions import Self
 from collections.abc import Callable
 
-from belphegor.bot import Belphegor
+from belphegor.bot import Interaction
 
 #=============================================================================================================================#
 
@@ -17,11 +17,3 @@ class File(discord.File):
     @classmethod
     def from_bytes(cls, b: bytes | bytearray, filename: str = "file", *, spoiler: bool = False, description: str | None = None):
         return discord.File(io.BytesIO(b), filename, spoiler = spoiler, description = description)
-
-#=============================================================================================================================#
-
-class Interaction(discord.Interaction):
-    @property
-    def client(self) -> Belphegor:
-        """:class:`Belphegor`: The client that is handling this interaction."""
-        return self._client

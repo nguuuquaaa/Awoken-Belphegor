@@ -1,16 +1,27 @@
 import discord
-from discord import app_commands as cmds
-from discord.ext import commands, tasks
+from discord import app_commands as ac
+from discord.ext import commands
 import asyncio
 from bson.codec_options import TypeRegistry
+import traceback
 
-from belphegor.db import MongoClientEX, MongoDatabaseEX, MongoEX
 from belphegor import utils
+from belphegor.db import MongoClientEX, MongoEX
+
+#=============================================================================================================================#
+
+log = utils.get_logger()
 
 #=============================================================================================================================#
 
 class State:
     pass
+
+class Interaction(discord.Interaction):
+    @property
+    def client(self) -> "Belphegor":
+        """:class:`Belphegor`: The client that is handling this interaction."""
+        return self._client
 
 #=============================================================================================================================#
 
@@ -26,16 +37,15 @@ class Belphegor(commands.Bot):
     ):
         self.initial_extensions = initial_extensions
         super().__init__(*args, **kwargs)
-        self.log = utils.get_logger()
 
         self.default_presence = default_presence
         self.start_time = utils.now()
-        self._counter = 0
+        self.state = State()
 
     async def setup_hook(self):
         for extension in self.initial_extensions:
             await self.load_extension(f"belphegor.extensions.{extension}")
-            self.log.info(f"Done loading {extension}")
+            log.info(f"Done loading {extension}")
 
         mongo_client = MongoClientEX(
             type_registry = TypeRegistry(fallback_encoder = str),
@@ -46,11 +56,15 @@ class Belphegor(commands.Bot):
             db = mongo_client.belphegor_db
         )
 
+        await self.tree.sync()
+
     async def on_ready(self):
-        self.log.info("Logged in as")
-        self.log.info(self.user.name)
-        self.log.info(self.user.id)
-        self.log.info("----------")
+        log.info("Logged in as")
+        log.info(self.user.name)
+        log.info(self.user.id)
+        log.info("----------")
         await asyncio.sleep(5)
         await self.change_presence(activity = self.default_presence)
 
+    async def on_error(self, event, /, *args, **kwargs):
+        log.error(f"{event} - args: {args} - kwargs: {kwargs}\n{traceback.format_exc()}")
