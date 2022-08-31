@@ -1,5 +1,6 @@
 venv
 _*
+!__init__.py
 .env
 test.*
 *.code-workspace
