@@ -453,7 +453,7 @@ class IronSaga(commands.Cog):
                 "format":       "json",
                 "redirects":    1
             }
-            resp = await self.bot.session.get(ISWIKI_API, param = params)
+            resp = await self.bot.session.get(ISWIKI_API, params = params)
             raw = json.loads(await resp.content.read())
             data = parser.parse(raw["parse"]["wikitext"]["*"])
             names = []
@@ -509,7 +509,7 @@ class IronSaga(commands.Cog):
     async def search_iswiki_for_pilot(self, name):
         resp = await self.bot.session.get(
             ISWIKI_API,
-            params={
+            params = {
                 "action":       "parse",
                 "prop":         "wikitext",
                 "page":         name,

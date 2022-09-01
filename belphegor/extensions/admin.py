@@ -138,7 +138,7 @@ class Admin(commands.Cog):
         """
         Sync all commands.
         """
-        await interaction.response.defer()
+        await interaction.response.defer(thinking = True)
         await self.bot.tree.sync()
         await interaction.followup.send("Synced.")
 
