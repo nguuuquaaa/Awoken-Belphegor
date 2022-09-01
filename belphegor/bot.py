@@ -65,6 +65,7 @@ class Belphegor(commands.Bot):
         await self.tree.sync()
 
     async def on_ready(self):
+        self.owner_id = self.application.owner.id
         log.info("Logged in as")
         log.info(self.user.name)
         log.info(self.user.id)

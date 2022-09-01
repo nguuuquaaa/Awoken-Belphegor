@@ -7,6 +7,7 @@ import numpy as np
 import time
 import io
 
+from belphegor import utils
 from belphegor.bot import Belphegor
 from belphegor.ext_types import Interaction
 from belphegor.templates.buttons import InputButton
@@ -119,7 +120,7 @@ class Misc(commands.Cog):
             e.add_field(name = "Input", value = f"```\n{inp}\n```", inline = False)
             e.add_field(name = "Result", value = msg, inline = False)
 
-            await view.response_to(interaction, embed = e)
+            await utils.InteractionHelper.response(interaction, embed = e)
 
 #=============================================================================================================================#
 

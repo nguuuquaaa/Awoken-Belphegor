@@ -13,7 +13,7 @@ import typing
 import enum
 
 from belphegor.bot import Belphegor
-from belphegor.ext_types.discord_types import Interaction
+from belphegor.ext_types.discord_types import Interaction, File
 from belphegor.templates.buttons import BaseButton, EmojiType
 from belphegor.templates.views import ContinuousInputView, StandardView
 from belphegor.templates.checks import Check
@@ -55,10 +55,10 @@ class Admin(commands.Cog):
                     else:
                         await interaction.client.load_extension(fullname_extension)
                 except commands.ExtensionError:
-                    await utils.InteractionHelper.response_to(interaction, content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```", view = self.view)
+                    await utils.InteractionHelper.response(interaction, content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```", view = self.view)
                 else:
                     log.info(f"Reloaded {fullname_extension}")
-                    await utils.InteractionHelper.response_to(interaction, content = f"```\nSuccess reloading {extension}```", view = self.view)
+                    await utils.InteractionHelper.response(interaction, content = f"```\nSuccess reloading {extension}```", view = self.view)
 
         view = StandardView()
         reload_button = ReloadButton()
@@ -92,6 +92,7 @@ class Admin(commands.Cog):
     ):
         view = ContinuousInputView(allowed_user = interaction.user)
         async for interaction, input in view.setup(interaction):
+            await interaction.response.defer()
             code = f"async def func():\n{textwrap.indent(input.value, '    ')}"
             env = {
                 "bot": self.bot,
@@ -107,7 +108,7 @@ class Admin(commands.Cog):
                 embed = discord.Embed()
                 embed.add_field(name = "Input", value = f"```py\n{input.value}\n```", inline = False)
                 embed.add_field(name = "Output", value = f"```py\n{e}\n```", inline = False)
-                await utils.InteractionHelper.response_to(interaction, embed = embed, view = view)
+                await utils.InteractionHelper.response(interaction, embed = embed, view = view)
             stdout = StringIO()
             func = env["func"]
             try:
@@ -122,24 +123,35 @@ class Admin(commands.Cog):
                 if value or add_text:
                     ret = (value + add_text).strip()
                     embed = discord.Embed()
-                    embed.add_field(name = "Input", value = f"```py\n{input.value}\n```", inline = False)
-                    if len(ret) > 1950:
-                        await utils.InteractionHelper.response_to(interaction, embed = embed, attachments = [discord.File.from_str(ret, "output.txt")], view = view)
+                    disp_value = input.value if len(input.value) <= 1000 else input.value[:1000] + "..."
+                    embed.add_field(name = "Input", value = f"```py\n{disp_value}\n```", inline = False)
+                    if len(ret) > 1000:
+                        await utils.InteractionHelper.response(interaction, embed = embed, file = File.from_str(ret, "output.txt"), view = view)
                     else:
                         embed.add_field(name = "Output", value = f"```\n{ret}\n```", inline = False)
-                        await utils.InteractionHelper.response_to(interaction, embed = embed, view = view)
+                        await utils.InteractionHelper.response(interaction, embed = embed, view = view)
 
     @ac.command(name = "sync")
     @ac.check(Check.owner_only())
     async def sync(
         self,
-        interaction: Interaction
+        interaction: Interaction,
+        scope: typing.Literal["guild", "global"] = "global",
+        guild_id: str = None
     ):
         """
         Sync all commands.
         """
         await interaction.response.defer(thinking = True)
-        await self.bot.tree.sync()
+        match scope:
+            case "guild":
+                if guild_id is None:
+                    await self.bot.tree.sync(guild = interaction.guild)
+                else:
+                    await self.bot.tree.sync(guild = discord.Object(int(guild_id)))
+            case "global":
+                await self.bot.tree.sync()
+
         await interaction.followup.send("Synced.")
 
 #=============================================================================================================================#

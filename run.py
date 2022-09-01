@@ -12,8 +12,11 @@ intents.presences = True
 bot = Belphegor(
     command_prefix = "bel ",
     initial_extensions = [
+        "error_handler",
         "admin",
-        "misc"
+        "help",
+        "misc",
+        "iron_saga"
     ],
     default_presence = discord.Game(name="with Awoken Chronos-senpai"),
     intents = intents
