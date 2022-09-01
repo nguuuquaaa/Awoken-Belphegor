@@ -4,6 +4,7 @@ from discord.ext import commands
 import asyncio
 from bson.codec_options import TypeRegistry
 import traceback
+import aiohttp
 
 from belphegor import utils
 from belphegor.db import MongoClientEX, MongoEX
@@ -39,15 +40,20 @@ class Belphegor(commands.Bot):
         super().__init__(*args, **kwargs)
 
         self.default_presence = default_presence
-        self.start_time = utils.now()
+        self.start_timestamp = utils.now()
         self.state = State()
+        self.session: aiohttp.ClientSession = None
 
     async def setup_hook(self):
+        self.session = aiohttp.ClientSession()
+
         for extension in self.initial_extensions:
             await self.load_extension(f"belphegor.extensions.{extension}")
             log.info(f"Done loading {extension}")
 
         mongo_client = MongoClientEX(
+            host = "db",
+            port = 27017,
             type_registry = TypeRegistry(fallback_encoder = str),
             tz_aware = True
         )
