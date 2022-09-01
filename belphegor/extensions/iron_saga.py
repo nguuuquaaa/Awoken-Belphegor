@@ -2,19 +2,22 @@ import discord
 from discord import app_commands as ac, ui
 from discord.ext import commands
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, TypeAlias, Optional
 from collections.abc import Callable
 from urllib.parse import quote
-import re
+import json
 from functools import partial
+import time
+import traceback
 
+from belphegor import errors, utils
+from belphegor.utils import CircleIter, grouper, wiki
 from belphegor.bot import Belphegor
-from belphegor.ext_types import Interaction
+from belphegor.ext_types import Interaction, File
 from belphegor.templates.views import StandardView
 from belphegor.templates.buttons import BaseButton, TriviaButton, SkinsButton
 from belphegor.templates.selects import BaseSelect
 from belphegor.templates.paginators import SingleRowPaginator, PageItem
-from belphegor.utils import CircleIter, grouper
 
 #=============================================================================================================================#
 
@@ -31,6 +34,37 @@ COPILOT_SLOTS = {
 }
 
 #=============================================================================================================================#
+
+parser = wiki.WikitextParser()
+
+@parser.set_box_handler("PilotInfo")
+@parser.set_box_handler("PilotInfo1")
+def handle_base_box(box, **kwargs):
+    return {"pilot_info": kwargs}
+
+@parser.set_box_handler("PilotIcon")
+def handle_icon_box(box, name, *args, **kwargs):
+    return name
+
+@parser.set_html_handler
+def handle_html(tag, text, **kwargs):
+    if tag == "tabber":
+        return {"tabber": text}
+    elif tag == "gallery":
+        return {"skin_gallery": text.strip().splitlines()}
+    else:
+        return text
+
+@parser.set_reference_handler
+def handle_reference(box, *args, **kwargs):
+    if box.startswith("File:"):
+        return {"file": box[5:]}
+    else:
+        return box
+
+#=============================================================================================================================#
+
+PilotPersonality: TypeAlias = Literal["Brave", "Calm", "Energetic", "Extreme", "Friendly", "Gentle", "Impatient", "Lazy", "Mighty", "Normal", "Peaceful", "Rational", "Sensitive", "Timid"]
 
 class PilotStats(BaseModel):
     melee: int
@@ -62,7 +96,7 @@ class Pilot(BaseModel):
     page_name: str
     faction: str
     stats: PilotStats
-    personality: Literal["Brave", "Calm", "Energetic", "Extreme", "Friendly", "Gentle", "Impatient", "Lazy", "Mighty", "Normal", "Peaceful", "Rational", "Sensitive", "Timid"]
+    personality: PilotPersonality
     copilot_slots: PilotCopilotSlots
     skills: tuple[PilotSkill, PilotSkill, PilotSkill, PilotSkill]
     artist: str | None
@@ -214,23 +248,10 @@ class IronSaga(commands.Cog):
         name: str
     ):
         pilots: dict[str, Pilot] = {}
-        async for doc in self.bot.db.pilot_index.aggregate([
+        async for doc in self.bot.mongo.db.iron_saga_pilots.aggregate([
             {
                 "$match": {
-                    "$or": [
-                        {
-                            "en_name": {
-                                "$regex": ".*?".join(map(re.escape, name.split())),
-                                "$options": "i"
-                            }
-                        },
-                        {
-                            "aliases": {
-                                "$regex": ".*?".join(map(re.escape, name.split())),
-                                "$options": "i"
-                            }
-                        }
-                    ]
+                    "$or": utils.QueryHelper.broad_search(name, "en_name", "aliases")
                 }
             },
             {
@@ -274,6 +295,176 @@ class IronSaga(commands.Cog):
             del pilots
             view = PilotView.from_pilot(pilot)
             await interaction.response.send_message(embed = view.embed_display(), view = view)
+
+    update_group = ac.Group(name = "update", description = "Update database")
+
+    @update_group.command(name = "pilot")
+    async def update_pilot(self, interaction: Interaction, name: Optional[str] = None):
+        await interaction.response.defer(thinking = True)
+        if name is None:
+            params = {
+                "action":       "parse",
+                "prop":         "wikitext",
+                "page":         "Pilot_List",
+                "format":       "json",
+                "redirects":    1
+            }
+            resp = await self.bot.session.get(ISWIKI_API, param = params)
+            raw = json.loads(await resp.content.read())
+            data = parser.parse(raw["parse"]["wikitext"]["*"])
+            names = []
+            for row in data[0]:
+                if len(row) > 1:
+                    value = row[1].rpartition("<br>")[2].strip()
+                    ret = parser.parse(value)
+                    names.append(ret)
+        else:
+            names = [n.strip() for n in name.split(";")]
+
+        progress_bar = utils.ProgressBar(
+            progress_message = f"Total: {len(names)} pilots\nFetching...\n",
+            done_message = f"Total: {len(names)} pilots\nDone.\n"
+        )
+
+        msg = await interaction.followup.send(progress_bar.progress(0), wait = True)
+
+        passed = []
+        failed = []
+        errors = {}
+        count = len(names)
+        prev = time.perf_counter()
+        for i, name in enumerate(names):
+            try:
+                pilot = await self.search_iswiki_for_pilot(name)
+            except:
+                errors[name] = traceback.format_exc()
+                failed.append(name)
+            else:
+                passed.append(pilot["en_name"])
+                index = pilot.pop("index")
+                await self.bot.mongo.db.iron_saga_pilots.update_one(
+                    {"index": index},
+                    {"$set": pilot, "$setOnInsert": {"aliases": []}},
+                    upsert = True
+                )
+            finally:
+                cur = time.perf_counter()
+                if cur - prev >= 5:
+                    await msg.edit(content = progress_bar.progress((i + 1) / count))
+                    prev = cur
+
+        await msg.edit(
+            content = f"Passed: {len(passed)}\nFailed: {len(failed)}",
+            attachments = [
+                File.from_str(json.dumps({"passed": passed, "failed": failed}, indent=4, ensure_ascii=False), "result.json"),
+                File.from_str(json.dumps(errors, indent=4, ensure_ascii=False), "errors.json")
+            ]
+        )
+
+    async def search_iswiki_for_pilot(self, name):
+        resp = await self.bot.session.get(
+            ISWIKI_API,
+            params={
+                "action":       "parse",
+                "prop":         "wikitext",
+                "page":         name,
+                "format":       "json",
+                "redirects":    1
+            }
+        )
+        raw = json.loads(await resp.content.read())
+        if "error" in raw:
+            raise errors.QueryFailed(f"Page {name} doesn't exist.")
+
+        page_id = raw["parse"]["pageid"]
+        raw_basic_info = raw["parse"]["wikitext"]["*"]
+        ret = parser.parse(raw_basic_info)
+        skins = {}
+        for item in ret:
+            if isinstance(item, dict):
+                skin_galleries = []
+
+                if "pilot_info" in item:
+                    basic_info = item["pilot_info"]
+                    elem = basic_info["image"][0]
+                    try:
+                        tabber = elem["tabber"]
+                    except KeyError:
+                        filename = elem["file"]
+                        skins.setdefault(filename, {"name": "Default", "url": f"{ISWIKI_BASE}/{wiki.generate_image_path(filename)}"})
+                    else:
+                        for tab in tabber:
+                            if isinstance(tab, dict):
+                                filename = tab["file"]
+                                name = filename[:-4].replace("_", " ").replace(" Render", "")
+                                skins.setdefault(filename, {"name": name, "url": f"{ISWIKI_BASE}/{wiki.generate_image_path(filename)}"})
+
+                    for elem in basic_info.get("skins", []):
+                        if isinstance(elem, dict):
+                            if "skin_gallery" in elem:
+                                skin_galleries.append(elem)
+
+                if "skin_gallery" in item:
+                    skin_galleries.append(item)
+
+                for sg in skin_galleries:
+                    for s in sg["skin_gallery"]:
+                        filename, _, name = s.partition("|")
+                        if filename.startswith("File:"):
+                            filename = filename[5:]
+                        name = filename[:-4].replace("_", " ").replace(" Render", "")
+                        skins.setdefault(filename, {"name": name, "url": f"{ISWIKI_BASE}/{wiki.generate_image_path(filename)}"})
+
+        pilot = {}
+        pilot["index"] = page_id
+        pilot["en_name"] = basic_info["name (english/romaji)"]
+        pilot["jp_name"] = basic_info["name (original)"]
+        pilot["page_name"] = raw["parse"]["title"]
+        pilot["description"] = basic_info.get("background")
+        pilot["personality"] = basic_info["personality"]
+        pilot["faction"] = basic_info["affiliation"]
+        pilot["artist"] = basic_info.get("artist")
+        pilot["voice_actor"] = basic_info.get("seiyuu")
+        pilot["stats"] = {
+            "melee": basic_info["meleemax"],
+            "ranged": basic_info["shootingmax"],
+            "defense": basic_info["defensemax"],
+            "reaction": basic_info["reactionmax"]
+        }
+        pilot["skills"] = [
+            {
+                "name": basic_info["activeskillname"],
+                "effect": basic_info["activeskilleffect"],
+                "copilot": COPILOT_SLOTS.get(basic_info.get("activeskilltype", "").lower())
+            },
+            {
+                "name": basic_info["passiveskill1name"],
+                "effect": basic_info["passiveskill1effect"],
+                "copilot": COPILOT_SLOTS.get(basic_info.get("passiveskill1type", "").lower())
+            },
+            {
+                "name": basic_info["passiveskill2name"],
+                "effect": basic_info["passiveskill2effect"],
+                "copilot": COPILOT_SLOTS.get(basic_info.get("passiveskill2type", "").lower())
+            },
+            {
+                "name": basic_info["passiveskill3name"],
+                "effect": basic_info["passiveskill3effect"],
+                "copilot": COPILOT_SLOTS.get(basic_info.get("passiveskill3type", "").lower())
+            }
+        ]
+        pilot["copilot_slots"] = {
+            "Attack": bool(basic_info.get("copilotattack")),
+            "Tech": bool(basic_info.get("copilottech")),
+            "Defense": bool(basic_info.get("copilotdefense")),
+            "Support": bool(basic_info.get("copilotsupport")),
+            "Control": bool(basic_info.get("copilotcontrol")),
+            "Special": bool(basic_info.get("copilotspecial"))
+        }
+        pilot["skins"] = list(skins.values())
+
+        return pilot
+
 
 #=============================================================================================================================#
 
