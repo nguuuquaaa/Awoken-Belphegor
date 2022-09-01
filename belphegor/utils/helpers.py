@@ -1,6 +1,6 @@
 import re
 import contextlib
-from collections.abc import AsyncIterator
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 #=============================================================================================================================#
@@ -81,15 +81,12 @@ class InteractionHelper:
 
 class QueryHelper:
     @staticmethod
-    def broad_search(name: str, *fields) -> list[dict]:
-        queries = []
-        for field in fields:
-            queries.append(
-                {
-                    field: {
-                        "$regex": ".*?".join(map(re.escape, name.split())),
-                        "$options": "i"
-                    }
+    def broad_search(name: str, fields: Iterable[str]) -> list[dict]:
+        return [
+            {
+                field: {
+                    "$regex": ".*?".join(map(re.escape, name.split())),
+                    "$options": "i"
                 }
-            )
-        return queries
+            } for field in fields
+        ]

@@ -5,5 +5,5 @@ _*
 test.*
 *.code-workspace
 docker-compose.test.yml
-data/db
+data/*
 logs

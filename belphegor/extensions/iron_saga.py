@@ -18,6 +18,7 @@ from belphegor.templates.views import StandardView
 from belphegor.templates.buttons import BaseButton, TriviaButton, SkinsButton
 from belphegor.templates.selects import BaseSelect
 from belphegor.templates.paginators import SingleRowPaginator, PageItem
+from belphegor.templates.checks import Check
 
 #=============================================================================================================================#
 
@@ -236,22 +237,61 @@ class PilotView(StandardView):
 
 #=============================================================================================================================#
 
+COLOR_MAPPING = {
+    "S": discord.Color.purple(),
+    "A": discord.Color.blue(),
+    "B": discord.Color.green(),
+    "C": discord.Color.light_grey()
+}
+
+class Part(BaseModel):
+    name: str
+    classification: Literal["core", "shell", "support", "armour", "coating"]
+    rank: Literal["S", "A", "B", "C"]
+    effect: str
+    thumbnail: str
+    aliases: list[str] = []
+
+    def display(self):
+        embed = discord.Embed(
+            title = f"[{self.classification.capitalize()}] {self.name}",
+            description = self.effect,
+            color = COLOR_MAPPING[self.rank]
+        )
+        embed.set_thumbnail(url = self.thumbnail)
+        return embed
+
+#=============================================================================================================================#
+
+class Pet(BaseModel):
+    name: str
+    effect: str
+    thumbnail: str
+    aliases: list[str] = []
+
+    def display(self):
+        embed = discord.Embed(
+            title = self.name,
+            description = self.effect,
+            color = discord.Color.purple()
+        )
+        embed.set_thumbnail(url = self.thumbnail)
+        return embed
+
+#=============================================================================================================================#
+
 class IronSaga(commands.Cog):
     def __init__(self, bot: Belphegor):
         self.bot = bot
 
     @ac.command(name = "pilot")
     @ac.describe(name = "Pilot name")
-    async def get_pilot(
-        self,
-        interaction: Interaction,
-        name: str
-    ):
+    async def get_pilot(self, interaction: Interaction, name: str):
         pilots: dict[str, Pilot] = {}
         async for doc in self.bot.mongo.db.iron_saga_pilots.aggregate([
             {
                 "$match": {
-                    "$or": utils.QueryHelper.broad_search(name, "en_name", "aliases")
+                    "$or": utils.QueryHelper.broad_search(name, ("en_name", "jp_name", "aliases"))
                 }
             },
             {
@@ -289,16 +329,120 @@ class IronSaga(commands.Cog):
             pilot = pilots[value]
             del pilots
             view = PilotView.from_pilot(pilot)
+            view.allowed_user = interaction.user
             await interaction.response.edit_message(embed = view.embed_display(), view = view)
         else:
             pilot = list(pilots.values())[0]
             del pilots
             view = PilotView.from_pilot(pilot)
+            view.allowed_user = interaction.user
             await interaction.response.send_message(embed = view.embed_display(), view = view)
 
-    update_group = ac.Group(name = "update", description = "Update database")
+    @ac.command(name = "part")
+    @ac.describe(name = "Part name")
+    async def get_part(self, interaction: Interaction, name: str):
+        parts: dict[str, Part] = {}
+        async for doc in self.bot.mongo.db.iron_saga_parts.aggregate([
+            {
+                "$match": {
+                    "$or": utils.QueryHelper.broad_search(name, ("name", "aliases"))
+                }
+            },
+            {
+                "$sort": {
+                    "en_name": 1
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0
+                }
+            }
+        ]):
+            parts[doc["name"]] = Part(**doc)
 
-    @update_group.command(name = "pilot")
+        if len(parts) == 0:
+            return await interaction.response.send_message(f"Can't find any part with name: {name}")
+
+
+        if len(parts) > 1:
+            class PartPaginator(SingleRowPaginator):
+                class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
+                    placeholder = "Select part"
+
+                class PaginatorTemplate(SingleRowPaginator.PaginatorTemplate):
+                    title = f"Found {len(parts)} parts"
+                    colour = discord.Colour.blue()
+
+            items = [PageItem(value = pn) for pn in parts]
+            items.sort(key = lambda x: x.value)
+
+            paginator = PartPaginator(items = items, page_size = 20)
+            async for interaction, value in paginator.setup(interaction, timeout = 180):
+                break
+
+            part = parts[value]
+            del parts
+            await interaction.response.send_message(embed = part.display())
+        else:
+            part = list(parts.values())[0]
+            del parts
+            await interaction.response.send_message(embed = part.display())
+
+    @ac.command(name = "pet")
+    @ac.describe(name = "Pet name")
+    async def get_pet(self, interaction: Interaction, name: str):
+        pets: dict[str, Pet] = {}
+        async for doc in self.bot.mongo.db.iron_saga_pets.aggregate([
+            {
+                "$match": {
+                    "$or": utils.QueryHelper.broad_search(name, ("name", "aliases"))
+                }
+            },
+            {
+                "$sort": {
+                    "en_name": 1
+                }
+            },
+            {
+                "$project": {
+                    "_id": 0
+                }
+            }
+        ]):
+            pets[doc["name"]] = Pet(**doc)
+
+        if len(pets) == 0:
+            return await interaction.response.send_message(f"Can't find any part with name: {name}")
+
+        if len(pets) > 1:
+            class PartPaginator(SingleRowPaginator):
+                class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
+                    placeholder = "Select pet"
+
+                class PaginatorTemplate(SingleRowPaginator.PaginatorTemplate):
+                    title = f"Found {len(pets)} parts"
+                    colour = discord.Colour.blue()
+
+            items = [PageItem(value = pn) for pn in pets]
+            items.sort(key = lambda x: x.value)
+
+            paginator = PartPaginator(items = items, page_size = 20)
+            async for interaction, value in paginator.setup(interaction, timeout = 180):
+                break
+
+            pet = pets[value]
+            del pets
+            await interaction.response.send_message(embed = pet.display())
+        else:
+            pet = list(pets.values())[0]
+            del pets
+            await interaction.response.send_message(embed = pet.display())
+
+    update = ac.Group(name = "update", description = "Update database")
+
+    @update.command(name = "pilot")
+    @ac.check(Check.owner_only())
     async def update_pilot(self, interaction: Interaction, name: Optional[str] = None):
         await interaction.response.defer(thinking = True)
         if name is None:
@@ -333,6 +477,7 @@ class IronSaga(commands.Cog):
         errors = {}
         count = len(names)
         prev = time.perf_counter()
+        col = self.bot.mongo.db.iron_saga_pilots
         for i, name in enumerate(names):
             try:
                 pilot = await self.search_iswiki_for_pilot(name)
@@ -342,7 +487,7 @@ class IronSaga(commands.Cog):
             else:
                 passed.append(pilot["en_name"])
                 index = pilot.pop("index")
-                await self.bot.mongo.db.iron_saga_pilots.update_one(
+                await col.update_one(
                     {"index": index},
                     {"$set": pilot, "$setOnInsert": {"aliases": []}},
                     upsert = True
@@ -465,6 +610,39 @@ class IronSaga(commands.Cog):
 
         return pilot
 
+    @update.command(name = "part")
+    async def update_part(self, interaction: Interaction, message_id: str):
+        try:
+            message_id = int(message_id)
+            message = await interaction.channel.fetch_message(message_id)
+            attachment = message.attachments[0]
+        except (ValueError, IndexError):
+            return await interaction.response.send_message("Invalid file.")
+
+        bytes_ = await attachment.read()
+        data = json.loads(bytes_)
+        col = self.bot.mongo.db.iron_saga_parts
+        await col.delete_many({})
+        for index, doc in enumerate(data):
+            await col.insert_one(doc)
+        await interaction.response.send_message("Done.")
+
+    @update.command(name = "pet")
+    async def update_pet(self, interaction: Interaction, message_id: str):
+        try:
+            message_id = int(message_id)
+            message = await interaction.channel.fetch_message(message_id)
+            attachment = message.attachments[0]
+        except (ValueError, IndexError):
+            return await interaction.response.send_message("Invalid file.")
+
+        bytes_ = await attachment.read()
+        data = json.loads(bytes_)
+        col = self.bot.mongo.db.iron_saga_pets
+        await col.delete_many({})
+        for index, doc in enumerate(data):
+            await col.insert_one(doc)
+        await interaction.response.send_message("Done.")
 
 #=============================================================================================================================#
 
