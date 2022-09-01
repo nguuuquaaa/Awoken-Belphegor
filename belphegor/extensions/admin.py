@@ -125,7 +125,7 @@ class Admin(commands.Cog):
                     embed.add_field(name = "Input", value = f"```py\n{input.value}\n```", inline = False)
                     if len(ret) > 1950:
                         await utils.InteractionHelper.response_to(interaction, embed = embed, attachments = [discord.File.from_str(ret, "output.txt")], view = view)
-                    elif len(ret) > 0:
+                    else:
                         embed.add_field(name = "Output", value = f"```\n{ret}\n```", inline = False)
                         await utils.InteractionHelper.response_to(interaction, embed = embed, view = view)
 
@@ -139,7 +139,7 @@ class Admin(commands.Cog):
         Sync all commands.
         """
         await self.bot.tree.sync(guild = interaction.guild)
-        await interaction.response.send("Synced.")
+        await interaction.response.send_message("Synced.")
 
 #=============================================================================================================================#
 
