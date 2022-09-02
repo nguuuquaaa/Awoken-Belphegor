@@ -1,6 +1,5 @@
 import discord
 import re
-import contextlib
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
@@ -10,7 +9,7 @@ from .log_utils import get_logger
 #=============================================================================================================================#
 
 if TYPE_CHECKING:
-    from belphegor.bot import Interaction
+    from belphegor.ext_types import Interaction
 
 log = get_logger()
 

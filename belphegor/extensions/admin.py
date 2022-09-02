@@ -14,7 +14,7 @@ import enum
 
 from belphegor import utils
 from belphegor.bot import Belphegor
-from belphegor.ext_types.discord_types import Interaction, File
+from belphegor.ext_types import Interaction, File
 from belphegor.templates.buttons import BaseButton, EmojiType
 from belphegor.templates.views import ContinuousInputView, StandardView
 from belphegor.templates.checks import Check

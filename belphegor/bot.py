@@ -18,12 +18,6 @@ log = utils.get_logger()
 class State:
     pass
 
-class Interaction(discord.Interaction):
-    @property
-    def client(self) -> "Belphegor":
-        """:class:`Belphegor`: The client that is handling this interaction."""
-        return self._client
-
 #=============================================================================================================================#
 
 class Belphegor(commands.Bot):
