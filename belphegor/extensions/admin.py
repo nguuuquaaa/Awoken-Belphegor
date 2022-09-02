@@ -15,6 +15,7 @@ import enum
 from belphegor import utils
 from belphegor.bot import Belphegor
 from belphegor.ext_types import Interaction, File
+from belphegor.errors import FlowControl
 from belphegor.templates.buttons import BaseButton, EmojiType
 from belphegor.templates.views import ContinuousInputView, StandardView
 from belphegor.templates.checks import Check
@@ -95,43 +96,54 @@ class Admin(commands.Cog):
         async for interaction, input in view.setup(interaction):
             response = utils.ResponseHelper(interaction)
             await response.thinking()
-            code = f"async def func():\n{textwrap.indent(input.value, '    ')}"
-            env = {
-                "bot": self.bot,
-                "interaction": interaction,
-                "discord": discord,
-                "commands": commands,
-                "utils": utils,
-                "asyncio": asyncio
-            }
+
             try:
-                exec(code, env)
-            except Exception as e:
-                embed = discord.Embed()
-                embed.add_field(name = "Input", value = f"```py\n{input.value}\n```", inline = False)
-                embed.add_field(name = "Output", value = f"```py\n{e}\n```", inline = False)
-                await response.send(embed = embed, view = view)
-            stdout = StringIO()
-            func = env["func"]
-            try:
-                with redirect_stdout(stdout):
-                    await func()
-            except:
-                add_text = f"\n{traceback.format_exc()}"
-            else:
-                add_text = "\n"
-            finally:
-                value = stdout.getvalue()
-                if value or add_text:
-                    ret = (value + add_text).strip()
+                code = f"async def func():\n{textwrap.indent(input.value, '    ')}"
+                env = {
+                    "bot": self.bot,
+                    "interaction": interaction,
+                    "response": response,
+                    "discord": discord,
+                    "utils": utils,
+                    "asyncio": asyncio
+                }
+
+                try:
+                    exec(code, env)
+                except Exception as e:
+                    raise FlowControl({"input": input.value, "output": str(e)})
+
+                stdout = StringIO()
+                func = env["func"]
+                try:
+                    with redirect_stdout(stdout):
+                        await func()
+                except:
+                    add_text = f"\n{traceback.format_exc()}"
+                else:
+                    add_text = ""
+                finally:
+                    raise FlowControl({"input": input.value, "output": (stdout.getvalue() + add_text).strip()})
+
+            except FlowControl as e:
+                iv = e.message["input"]
+                ov = e.message["output"]
+                if len(iv) > 1000 or len(ov) > 1000:
+                    await response.send(
+                        files = [
+                            File.from_str(iv, "input.py"),
+                            File.from_str(ov, "output.txt")
+                        ],
+                        view = view
+                    )
+                else:
                     embed = discord.Embed()
-                    disp_value = input.value if len(input.value) <= 1000 else input.value[:1000] + "..."
-                    embed.add_field(name = "Input", value = f"```py\n{disp_value}\n```", inline = False)
-                    if len(ret) > 1000:
-                        await response.send(embed = embed, file = File.from_str(ret, "output.txt"), view = view)
-                    else:
-                        embed.add_field(name = "Output", value = f"```\n{ret}\n```", inline = False)
-                        await response.send(embed = embed, view = view)
+                    embed.add_field(name = "Input", value = f"```py\n{iv}\n```", inline = False)
+                    embed.add_field(name = "Output", value = f"```\n{ov}\n```", inline = False)
+                    await response.send(
+                        embed = embed,
+                        view = view
+                    )
 
     @ac.command(name = "sync")
     @ac.check(Check.owner_only())
