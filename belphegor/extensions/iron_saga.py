@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands as ac, ui
 from discord.ext import commands
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Literal, TypeAlias, Optional
 from collections.abc import Callable
 from urllib.parse import quote
@@ -72,19 +72,19 @@ def handle_reference(box, *args, **kwargs):
 PilotPersonality: TypeAlias = Literal["Brave", "Calm", "Energetic", "Extreme", "Friendly", "Gentle", "Impatient", "Lazy", "Mighty", "Normal", "Peaceful", "Rational", "Sensitive", "Timid"]
 
 class PilotStats(BaseModel):
-    melee: int
-    ranged: int
-    defense: int
-    reaction: int
+    melee: int = Field(..., gt = 0)
+    ranged: int = Field(..., gt = 0)
+    defense: int = Field(..., gt = 0)
+    reaction: int = Field(..., gt = 0)
 
 class PilotSkill(BaseModel):
-    name: str
-    effect: str
+    name: str = Field(..., min_length = 1)
+    effect: str = Field(..., min_length = 1)
     copilot: str | None
 
 class PilotSkin(BaseModel):
-    name: str
-    url: str
+    name: str = Field(..., min_length = 1)
+    url: str = Field(..., min_length = 1)
 
     @classmethod
     def from_filename(cls, filename: str) -> dict:
@@ -104,9 +104,9 @@ class PilotCopilotSlots(BaseModel):
 
 class Pilot(BaseModel):
     index: int
-    en_name: str
+    en_name: str = Field(..., min_length = 1)
     jp_name: str
-    page_name: str
+    page_name: str = Field(..., min_length = 1)
     faction: str
     stats: PilotStats
     personality: PilotPersonality
@@ -395,7 +395,7 @@ class IronSaga(commands.Cog):
 
             part = parts[value]
             del parts
-            await interaction.response.send_message(embed = part.display())
+            await interaction.response.edit_message(embed = part.display())
         else:
             part = list(parts.values())[0]
             del parts
@@ -428,7 +428,7 @@ class IronSaga(commands.Cog):
             return await interaction.response.send_message(f"Can't find any part with name: {name}")
 
         if len(pets) > 1:
-            class PartPaginator(SingleRowPaginator):
+            class PetPaginator(SingleRowPaginator):
                 class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
                     placeholder = "Select pet"
 
@@ -439,13 +439,13 @@ class IronSaga(commands.Cog):
             items = [PageItem(value = pn) for pn in pets]
             items.sort(key = lambda x: x.value)
 
-            paginator = PartPaginator(items = items, page_size = 20)
+            paginator = PetPaginator(items = items, page_size = 20)
             async for interaction, value in paginator.setup(interaction, timeout = 180):
                 break
 
             pet = pets[value]
             del pets
-            await interaction.response.send_message(embed = pet.display())
+            await interaction.response.edit_message(embed = pet.display())
         else:
             pet = list(pets.values())[0]
             del pets
@@ -478,8 +478,8 @@ class IronSaga(commands.Cog):
             names = [n.strip() for n in name.split(";")]
 
         progress_bar = utils.ProgressBar(
-            progress_message = f"Total: {len(names)} pilots\nFetching...\n",
-            done_message = f"Total: {len(names)} pilots\nDone.\n"
+            progress_message = f"Total: {len(names)} pilots\nFetching...",
+            done_message = f"Total: {len(names)} pilots\nDone."
         )
 
         msg = await interaction.followup.send(progress_bar.progress(0), wait = True)
@@ -497,11 +497,18 @@ class IronSaga(commands.Cog):
                 errors[name] = traceback.format_exc()
                 failed.append(name)
             else:
-                passed.append(pilot["en_name"])
-                index = pilot.pop("index")
+                passed.append(pilot.en_name)
+                index = pilot.index
                 await col.update_one(
-                    {"index": index},
-                    {"$set": pilot, "$setOnInsert": {"aliases": []}},
+                    {
+                        "index": index
+                    },
+                    {
+                        "$set": pilot.dict(),
+                        "$setOnInsert": {
+                            "aliases": []
+                        }
+                    },
                     upsert = True
                 )
             finally:
@@ -536,7 +543,7 @@ class IronSaga(commands.Cog):
         page_id = raw["parse"]["pageid"]
         raw_basic_info = raw["parse"]["wikitext"]["*"]
         ret = parser.parse(raw_basic_info)
-        skins = {}
+        skins: dict[str, PilotSkin] = {}
         for item in ret:
             if isinstance(item, dict):
                 skin_galleries = []
@@ -548,15 +555,15 @@ class IronSaga(commands.Cog):
                         tabber = elem[0]["tabber"]
                     except KeyError:
                         filename = elem[0]["file"]
-                        skins.setdefault(filename, PilotSkin.from_filename(filename).dict())
+                        skins.setdefault(filename, PilotSkin.from_filename(filename))
                     except TypeError:
                         filename = elem.strip()
-                        skins.setdefault(filename, PilotSkin.from_filename(filename).dict())
+                        skins.setdefault(filename, PilotSkin.from_filename(filename))
                     else:
                         for tab in tabber:
                             if isinstance(tab, dict):
                                 filename = tab["file"]
-                                skins.setdefault(filename, PilotSkin.from_filename(filename).dict())
+                                skins.setdefault(filename, PilotSkin.from_filename(filename))
 
                     for elem in basic_info.get("skins", []):
                         if isinstance(elem, dict):
@@ -571,55 +578,58 @@ class IronSaga(commands.Cog):
                         filename, _, name = s.partition("|")
                         if filename.startswith("File:"):
                             filename = filename[5:]
-                        skins.setdefault(filename, PilotSkin.from_filename(filename).dict())
+                        skins.setdefault(filename, PilotSkin.from_filename(filename))
 
-        pilot = {}
-        pilot["index"] = page_id
-        pilot["en_name"] = basic_info["name (english/romaji)"]
-        pilot["jp_name"] = basic_info["name (original)"]
-        pilot["page_name"] = raw["parse"]["title"]
-        pilot["description"] = basic_info.get("background")
-        pilot["personality"] = basic_info["personality"]
-        pilot["faction"] = basic_info["affiliation"]
-        pilot["artist"] = basic_info.get("artist")
-        pilot["voice_actor"] = basic_info.get("seiyuu")
-        pilot["stats"] = {
-            "melee": basic_info["meleemax"],
-            "ranged": basic_info["shootingmax"],
-            "defense": basic_info["defensemax"],
-            "reaction": basic_info["reactionmax"]
-        }
-        pilot["skills"] = [
-            {
-                "name": basic_info["activeskillname"],
-                "effect": basic_info["activeskilleffect"],
-                "copilot": COPILOT_SLOTS.get(basic_info.get("activeskilltype", "").lower())
-            },
-            {
-                "name": basic_info["passiveskill1name"],
-                "effect": basic_info["passiveskill1effect"],
-                "copilot": COPILOT_SLOTS.get(basic_info.get("passiveskill1type", "").lower())
-            },
-            {
-                "name": basic_info["passiveskill2name"],
-                "effect": basic_info["passiveskill2effect"],
-                "copilot": COPILOT_SLOTS.get(basic_info.get("passiveskill2type", "").lower())
-            },
-            {
-                "name": basic_info["passiveskill3name"],
-                "effect": basic_info["passiveskill3effect"],
-                "copilot": COPILOT_SLOTS.get(basic_info.get("passiveskill3type", "").lower())
-            }
-        ]
-        pilot["copilot_slots"] = {
-            "Attack": bool(basic_info.get("copilotattack")),
-            "Tech": bool(basic_info.get("copilottech")),
-            "Defense": bool(basic_info.get("copilotdefense")),
-            "Support": bool(basic_info.get("copilotsupport")),
-            "Control": bool(basic_info.get("copilotcontrol")),
-            "Special": bool(basic_info.get("copilotspecial"))
-        }
-        pilot["skins"] = list(skins.values())
+        pilot = Pilot(
+            index = page_id,
+            en_name = basic_info["name (english/romaji)"],
+            jp_name = basic_info["name (original)"],
+            page_name = raw["parse"]["title"],
+            description = basic_info.get("background"),
+            personality = basic_info["personality"],
+            faction = basic_info["affiliation"],
+            artist = basic_info.get("artist"),
+            voice_actor = basic_info.get("seiyuu"),
+            stats = PilotStats(
+                melee = utils.to_int(basic_info["meleemax"]),
+                ranged = utils.to_int(basic_info["shootingmax"]),
+                defense = utils.to_int(basic_info["defensemax"]),
+                reaction = utils.to_int(basic_info["reactionmax"])
+            ),
+            skills = (
+                PilotSkill(
+                    name = basic_info["activeskillname"],
+                    effect = basic_info["activeskilleffect"],
+                    copilot = COPILOT_SLOTS.get(basic_info.get("activeskilltype", "").lower())
+                ),
+                PilotSkill(
+                    name = basic_info["passiveskill1name"],
+                    effect = basic_info["passiveskill1effect"],
+                    copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill1type", "").lower())
+                ),
+                PilotSkill(
+                    name = basic_info["passiveskill2name"],
+                    effect = basic_info["passiveskill2effect"],
+                    copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill2type", "").lower())
+                ),
+                PilotSkill(
+                    name = basic_info["passiveskill3name"],
+                    effect = basic_info["passiveskill3effect"],
+                    copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill3type", "").lower())
+                )
+            ),
+            copilot_slots = PilotCopilotSlots(
+                Attack = bool(basic_info.get("copilotattack")),
+                Tech = bool(basic_info.get("copilottech")),
+                Defense = bool(basic_info.get("copilotdefense")),
+                Support = bool(basic_info.get("copilotsupport")),
+                Control = bool(basic_info.get("copilotcontrol")),
+                Special = bool(basic_info.get("copilotspecial"))
+            ),
+            skins = list(skins.values())
+        )
+
+        print(pilot)
 
         return pilot
 
