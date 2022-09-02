@@ -6,6 +6,26 @@ from urllib.parse import quote
 
 #=============================================================================================================================#
 
+class ProgressBar:
+    def __init__(self, *, progress_message: str = "Working...", done_message: str = "Done.", length: int = 20):
+        self.progress_message = progress_message
+        self.done_message = done_message
+        self.length = length
+
+    def construct(self, rate: float):
+        rate = max(min(rate, 1.0), 0.0)
+        bf = "\u2588" * int(rate * self.length)
+        c = "\u2591"
+        return f"{bf:{c}<{self.length}} {rate * 100:.2f}%"
+
+    def progress(self, rate: float):
+        return f"{self.progress_message}\nProgress: {self.construct(rate)}"
+
+    def done(self):
+        return f"{self.done_message}\nProgress: {self.construct(1.0)}"
+
+#=============================================================================================================================#
+
 _WHITESPACE = re.compile(r"\s*")
 
 class ConcatJSONDecoder(json.JSONDecoder):

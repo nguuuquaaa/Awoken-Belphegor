@@ -6,6 +6,7 @@ import asyncio
 import numpy as np
 import time
 import io
+from concurrent.futures import ProcessPoolExecutor
 
 from belphegor import utils
 from belphegor.bot import Belphegor
@@ -40,6 +41,10 @@ class MathView(ContinuousInputView):
 class Misc(commands.Cog):
     def __init__(self, bot: Belphegor):
         self.bot = bot
+        self.pool = ProcessPoolExecutor(max_workers = 5)
+
+    async def cog_unload(self):
+        await asyncio.get_running_loop().run_in_executor(self.pool.shutdown(wait = True, cancel_futures = False))
 
     @ac.command(name = "eca")
     @ac.describe(rule_number = "Rule number")
@@ -87,6 +92,8 @@ class Misc(commands.Cog):
 
         view = MathView(allowed_user = interaction.user)
         async for interaction, input in view.setup(interaction):
+            response = utils.ResponseHelper(interaction)
+            await response.thinking()
             inp = input.value
             try:
                 start = time.perf_counter()
@@ -120,7 +127,7 @@ class Misc(commands.Cog):
             e.add_field(name = "Input", value = f"```\n{inp}\n```", inline = False)
             e.add_field(name = "Result", value = msg, inline = False)
 
-            await utils.InteractionHelper.response(interaction, embed = e)
+            await response.send(embed = e)
 
 #=============================================================================================================================#
 

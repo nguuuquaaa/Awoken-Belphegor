@@ -12,12 +12,12 @@ import os
 import typing
 import enum
 
+from belphegor import utils
 from belphegor.bot import Belphegor
 from belphegor.ext_types.discord_types import Interaction, File
 from belphegor.templates.buttons import BaseButton, EmojiType
 from belphegor.templates.views import ContinuousInputView, StandardView
 from belphegor.templates.checks import Check
-from belphegor import utils
 
 #=============================================================================================================================#
 
@@ -49,16 +49,17 @@ class Admin(commands.Cog):
 
             async def callback(self, interaction: Interaction):
                 fullname_extension = f"belphegor.extensions.{extension}"
+                response = utils.ResponseHelper(interaction)
                 try:
                     if fullname_extension in interaction.client.extensions:
                         await interaction.client.reload_extension(fullname_extension)
                     else:
                         await interaction.client.load_extension(fullname_extension)
                 except commands.ExtensionError:
-                    await utils.InteractionHelper.response(interaction, content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```", view = self.view)
+                    await response.send(content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```", view = self.view)
                 else:
                     log.info(f"Reloaded {fullname_extension}")
-                    await utils.InteractionHelper.response(interaction, content = f"```\nSuccess reloading {extension}```", view = self.view)
+                    await response.send(content = f"```\nSuccess reloading {extension}```", view = self.view)
 
         view = StandardView()
         reload_button = ReloadButton()
@@ -74,15 +75,15 @@ class Admin(commands.Cog):
         interaction: Interaction,
         module: str
     ):
-        m = importlib.import_module(f"belphegor.{module}")
         try:
+            m = importlib.import_module(f"belphegor.{module}")
             importlib.reload(m)
-        except:
+        except :
             traceback.print_exc()
-            await interaction.response.send_message(f"```\Failed reimporting {module}```")
+            await interaction.response.send_message(f"```\nFailed reimporting: {module}```")
         else:
             print(f"Reimported belphegor.{module}")
-            await interaction.response.send_message(f"```\nSuccess reimporting {module}```")
+            await interaction.response.send_message(f"```\nSuccess reimporting: {module}```")
 
     @ac.command(name = "eval")
     @ac.check(Check.owner_only())
@@ -92,7 +93,8 @@ class Admin(commands.Cog):
     ):
         view = ContinuousInputView(allowed_user = interaction.user)
         async for interaction, input in view.setup(interaction):
-            await interaction.response.defer()
+            response = utils.ResponseHelper(interaction)
+            await response.thinking()
             code = f"async def func():\n{textwrap.indent(input.value, '    ')}"
             env = {
                 "bot": self.bot,
@@ -108,7 +110,7 @@ class Admin(commands.Cog):
                 embed = discord.Embed()
                 embed.add_field(name = "Input", value = f"```py\n{input.value}\n```", inline = False)
                 embed.add_field(name = "Output", value = f"```py\n{e}\n```", inline = False)
-                await utils.InteractionHelper.response(interaction, embed = embed, view = view)
+                await response.send(embed = embed, view = view)
             stdout = StringIO()
             func = env["func"]
             try:
@@ -126,10 +128,10 @@ class Admin(commands.Cog):
                     disp_value = input.value if len(input.value) <= 1000 else input.value[:1000] + "..."
                     embed.add_field(name = "Input", value = f"```py\n{disp_value}\n```", inline = False)
                     if len(ret) > 1000:
-                        await utils.InteractionHelper.response(interaction, embed = embed, file = File.from_str(ret, "output.txt"), view = view)
+                        await response.send(embed = embed, file = File.from_str(ret, "output.txt"), view = view)
                     else:
                         embed.add_field(name = "Output", value = f"```\n{ret}\n```", inline = False)
-                        await utils.InteractionHelper.response(interaction, embed = embed, view = view)
+                        await response.send(embed = embed, view = view)
 
     @ac.command(name = "sync")
     @ac.check(Check.owner_only())
