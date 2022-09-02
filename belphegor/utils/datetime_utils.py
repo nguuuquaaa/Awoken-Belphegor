@@ -56,13 +56,13 @@ def human_readable_time(seconds: int | float) -> str:
 
 class Timer:
     def __init__(self, interval: int | float = 10):
-        self.start = time.monotonic()
+        self.start = time.perf_counter()
         self.previous = self.start
         self.interval = interval
 
     def check(self) -> int | None:
         """Return time passed in seconds every [interval] seconds."""
-        current = time.monotonic()
+        current = time.perf_counter()
         if current - self.previous > self.interval:
             self.previous = current
             passed = int(current - self.start)
@@ -72,7 +72,7 @@ class Timer:
 
     def check_h(self) -> str | None:
         """Return time passed in human readable format every [interval] seconds."""
-        current = time.monotonic()
+        current = time.perf_counter()
         if current - self.previous > self.interval:
             self.previous = current
             passed = int(current - self.start)
