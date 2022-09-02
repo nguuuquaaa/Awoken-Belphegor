@@ -21,7 +21,8 @@ class ErrorHandler(commands.Cog):
         bot.tree.on_error = self.on_app_command_error
 
     async def on_app_command_error(self, interaction: Interaction, exception: Exception):
-        log.error(f"{type(exception)}: {exception}\n{traceback.format_exception(exception)}")
+        t = "\n".join(traceback.format_exception(exception))
+        log.error(f"{type(exception)}: {exception}\n{t}")
 
 #=============================================================================================================================#
 
