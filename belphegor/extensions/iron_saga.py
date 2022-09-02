@@ -86,6 +86,14 @@ class PilotSkin(BaseModel):
     name: str
     url: str
 
+    @classmethod
+    def from_filename(cls, filename: str) -> dict:
+        name = filename[:-4].replace("_", " ").replace(" Render", "")
+        return cls.construct(
+            name = name,
+            url = f"{ISWIKI_BASE}/{wiki.generate_image_path(filename)}"
+        )
+
 class PilotCopilotSlots(BaseModel):
     Attack: bool
     Tech: bool
@@ -535,18 +543,20 @@ class IronSaga(commands.Cog):
 
                 if "pilot_info" in item:
                     basic_info = item["pilot_info"]
-                    elem = basic_info["image"][0]
+                    elem = basic_info["image"]
                     try:
-                        tabber = elem["tabber"]
+                        tabber = elem[0]["tabber"]
                     except KeyError:
-                        filename = elem["file"]
-                        skins.setdefault(filename, {"name": "Default", "url": f"{ISWIKI_BASE}/{wiki.generate_image_path(filename)}"})
+                        filename = elem[0]["file"]
+                        skins.setdefault(filename, PilotSkin.from_filename(filename).dict())
+                    except TypeError:
+                        filename = elem.strip()
+                        skins.setdefault(filename, PilotSkin.from_filename(filename).dict())
                     else:
                         for tab in tabber:
                             if isinstance(tab, dict):
                                 filename = tab["file"]
-                                name = filename[:-4].replace("_", " ").replace(" Render", "")
-                                skins.setdefault(filename, {"name": name, "url": f"{ISWIKI_BASE}/{wiki.generate_image_path(filename)}"})
+                                skins.setdefault(filename, PilotSkin.from_filename(filename).dict())
 
                     for elem in basic_info.get("skins", []):
                         if isinstance(elem, dict):
@@ -561,8 +571,7 @@ class IronSaga(commands.Cog):
                         filename, _, name = s.partition("|")
                         if filename.startswith("File:"):
                             filename = filename[5:]
-                        name = filename[:-4].replace("_", " ").replace(" Render", "")
-                        skins.setdefault(filename, {"name": name, "url": f"{ISWIKI_BASE}/{wiki.generate_image_path(filename)}"})
+                        skins.setdefault(filename, PilotSkin.from_filename(filename).dict())
 
         pilot = {}
         pilot["index"] = page_id
