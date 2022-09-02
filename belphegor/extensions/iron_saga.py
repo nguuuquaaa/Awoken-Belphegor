@@ -634,6 +634,7 @@ class IronSaga(commands.Cog):
         return pilot
 
     @update.command(name = "part")
+    @ac.check(Check.owner_only())
     async def update_part(self, interaction: Interaction, message_id: str):
         try:
             message_id = int(message_id)
@@ -651,6 +652,7 @@ class IronSaga(commands.Cog):
         await interaction.response.send_message("Done.")
 
     @update.command(name = "pet")
+    @ac.check(Check.owner_only())
     async def update_pet(self, interaction: Interaction, message_id: str):
         try:
             message_id = int(message_id)
