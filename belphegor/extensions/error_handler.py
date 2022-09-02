@@ -5,18 +5,23 @@ import traceback
 from PIL import Image
 import aiohttp
 
+from belphegor import utils
 from belphegor.bot import Belphegor
 from belphegor.ext_types import Interaction
+
+#=============================================================================================================================#
+
+log = utils.get_logger()
 
 #=============================================================================================================================#
 
 class ErrorHandler(commands.Cog):
     def __init__(self, bot: Belphegor):
         self.bot = bot
+        bot.tree.on_error = self.on_app_command_error
 
-    @commands.Cog.listener()
-    async def on_command_error(self, interaction: Interaction, exception: Exception):
-        self.bot.log.error(f"{type(exception)}: {exception}\n{traceback.format_exception(exception)}")
+    async def on_app_command_error(self, interaction: Interaction, exception: Exception):
+        log.error(f"{type(exception)}: {exception}\n{traceback.format_exception(exception)}")
 
 #=============================================================================================================================#
 
