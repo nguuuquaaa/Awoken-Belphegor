@@ -161,6 +161,11 @@ class JumpToButton(InputButton[_V]):
 
 #=============================================================================================================================#
 
+class StatsButton(BaseButton[_V]):
+    label: str = "Stats"
+    emoji: EmojiType = None
+    style: ButtonStyle = ButtonStyle.primary
+
 class TriviaButton(BaseButton[_V]):
     label: str = "Trivia"
     emoji: EmojiType = "\U0001f5d2"

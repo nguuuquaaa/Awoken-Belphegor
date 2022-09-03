@@ -15,7 +15,7 @@ from belphegor.utils import CircleIter, grouper, wiki
 from belphegor.bot import Belphegor
 from belphegor.ext_types import Interaction, File
 from belphegor.templates.views import StandardView
-from belphegor.templates.buttons import BaseButton, TriviaButton, SkinsButton
+from belphegor.templates.buttons import BaseButton, StatsButton, TriviaButton, SkinsButton
 from belphegor.templates.selects import BaseSelect
 from belphegor.templates.paginators import SingleRowPaginator, PageItem
 from belphegor.templates.checks import Check
@@ -173,10 +173,8 @@ class Pilot(BaseModel):
 
 #=============================================================================================================================#
 
-class ISStatsButton(BaseButton["PilotView"]):
-    label = "Stats"
+class ISStatsButton(StatsButton["PilotView"]):
     emoji = discord.PartialEmoji(name = "exp_capsule", id = 824327490536341504)
-    style = discord.ButtonStyle.primary
 
     async def callback(self, interaction: Interaction):
         view = self.view
