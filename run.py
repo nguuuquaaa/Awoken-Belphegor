@@ -16,6 +16,7 @@ bot = Belphegor(
         "admin",
         "help",
         "misc",
+        "otogi",
         "iron_saga"
     ],
     default_presence = discord.Game(name="with Awoken Chronos-senpai"),
