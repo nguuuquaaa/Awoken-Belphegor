@@ -395,7 +395,7 @@ class IronSaga(commands.Cog):
 
             part = parts[value]
             del parts
-            await interaction.response.edit_message(embed = part.display())
+            await interaction.response.edit_message(embed = part.display(), view = None)
         else:
             part = list(parts.values())[0]
             del parts
@@ -445,7 +445,7 @@ class IronSaga(commands.Cog):
 
             pet = pets[value]
             del pets
-            await interaction.response.edit_message(embed = pet.display())
+            await interaction.response.edit_message(embed = pet.display(), view = None)
         else:
             pet = list(pets.values())[0]
             del pets
