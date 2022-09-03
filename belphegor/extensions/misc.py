@@ -97,7 +97,7 @@ class Misc(commands.Cog):
             inp = input.value
             try:
                 start = time.perf_counter()
-                r = await asyncio.get_running_loop().run_in_executor(None, m.result, inp)
+                r = await asyncio.get_running_loop().run_in_executor(self.pool, m.result, inp)
                 end = time.perf_counter()
                 time_taken = end - start
             except calculator.ParseError as e:
@@ -127,7 +127,7 @@ class Misc(commands.Cog):
             e.add_field(name = "Input", value = f"```\n{inp}\n```", inline = False)
             e.add_field(name = "Result", value = msg, inline = False)
 
-            await response.send(embed = e)
+            await response.send(embed = e, view = view)
 
 #=============================================================================================================================#
 
