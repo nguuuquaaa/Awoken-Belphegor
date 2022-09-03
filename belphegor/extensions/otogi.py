@@ -275,18 +275,21 @@ class Otogi(commands.Cog):
                     rarity = 4
                 else:
                     rarity = 3
-
                 did = random.choice(pool[rarity])
                 daemon = await self.db.otogi_daemons.find_one({"index": did}, {"_id": 0, "name": 1, "pic_url": 1})
+                inner_self.view.total_summons += 1
+
                 embed = discord.Embed(
                     title = f"{interaction.user.display_name} summoned {daemon['name']}!",
                     colour = discord.Colour.orange()
                 )
                 embed.set_image(url = daemon["pic_url"])
+                embed.set_footer(text = f"Total: {inner_self.view.total_summons} summons")
                 response = utils.ResponseHelper(interaction)
                 await response.send(embed = embed, view = inner_self.view)
 
         view = StandardView()
+        view.total_summons = 0
         summon = SummonOneButton()
         view.add_item(summon)
         view.add_exit_button()
