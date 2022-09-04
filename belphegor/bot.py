@@ -40,11 +40,6 @@ class Belphegor(commands.Bot):
 
     async def setup_hook(self):
         self.session = aiohttp.ClientSession()
-
-        for extension in self.initial_extensions:
-            await self.load_extension(f"belphegor.extensions.{extension}")
-            log.info(f"Done loading {extension}")
-
         mongo_client = MongoClientEX(
             host = "db",
             port = 27017,
@@ -55,6 +50,10 @@ class Belphegor(commands.Bot):
             client = mongo_client,
             db = mongo_client.belphegor_db
         )
+
+        for extension in self.initial_extensions:
+            await self.load_extension(f"belphegor.extensions.{extension}")
+            log.info(f"Done loading {extension}")
 
         await self.tree.sync()
 
