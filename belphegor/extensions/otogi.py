@@ -88,7 +88,7 @@ class Daemon(BaseModel):
             title = f"{EMOJIS[self.daemon_type]} {self.name}",
             description =
                 f"{EMOJIS[self.daemon_class]} | {str(EMOJIS['star']) * self.rarity}\n"
-                f"{EMOJIS['atk']} {self.max_hp}/{self.mlb_hp}\n{EMOJIS['hp']} {self.max_hp}/{self.mlb_hp}"
+                f"{EMOJIS['atk']} {self.max_atk}/{self.mlb_atk}\n{EMOJIS['hp']} {self.max_hp}/{self.mlb_hp}"
                 "\n----------------------------------------------------------------------------------",
             colour = discord.Colour.orange()
         )
