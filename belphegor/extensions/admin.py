@@ -35,6 +35,7 @@ class Admin(commands.Cog):
 
     @ac.command(name = "reload")
     @ac.describe(extension = "Extension to reload")
+    @ac.guilds(306527473997316097, 376585779536723970, 738232588279218338)
     @ac.check(Check.owner_only())
     async def reload(
         self,
@@ -70,6 +71,7 @@ class Admin(commands.Cog):
 
     @ac.command(name = "reimport")
     @ac.describe(module = "Module to reimport")
+    @ac.guilds(306527473997316097, 376585779536723970, 738232588279218338)
     @ac.check(Check.owner_only())
     async def reimport(
         self,
@@ -87,6 +89,7 @@ class Admin(commands.Cog):
             await interaction.response.send_message(f"```\nSuccess reimporting: {module}```")
 
     @ac.command(name = "eval")
+    @ac.guilds(306527473997316097, 376585779536723970, 738232588279218338)
     @ac.check(Check.owner_only())
     async def _eval(
         self,
@@ -145,28 +148,26 @@ class Admin(commands.Cog):
                         view = view
                     )
 
-    @ac.command(name = "sync")
-    @ac.check(Check.owner_only())
-    async def sync(
+    @commands.command(name = "sync")
+    @commands.is_owner()
+    async def old_sync(
         self,
-        interaction: Interaction,
+        ctx: commands.Context,
         scope: typing.Literal["guild", "global"] = "global",
-        guild_id: str = None
+        *guild_ids: int
     ):
-        """
-        Sync all commands.
-        """
-        await interaction.response.defer(thinking = True)
-        match scope:
-            case "guild":
-                if guild_id is None:
-                    await self.bot.tree.sync(guild = interaction.guild)
-                else:
-                    await self.bot.tree.sync(guild = discord.Object(int(guild_id)))
-            case "global":
-                await self.bot.tree.sync()
-
-        await interaction.followup.send("Synced.")
+        async with ctx.typing():
+            await self.bot.tree.sync()
+            match scope:
+                case "guild":
+                    if guild_ids:
+                        for guild_id in guild_ids:
+                            await self.bot.tree.sync(guild = discord.Object(guild_id))
+                    else:
+                        await self.bot.tree.sync(guild = ctx.guild)
+                case "global":
+                    await self.bot.tree.sync()
+        await ctx.send("Synced.")
 
 #=============================================================================================================================#
 

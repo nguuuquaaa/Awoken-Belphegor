@@ -68,3 +68,6 @@ class Belphegor(commands.Bot):
 
     async def on_error(self, event, /, *args, **kwargs):
         log.error(f"{event} - args: {args} - kwargs: {kwargs}\n{traceback.format_exc()}")
+
+    async def get_prefix(self, message: discord.Message):
+        return [f"<@{self.user.id}> ", f"<@!{self.user.id}> ", self.command_prefix]
