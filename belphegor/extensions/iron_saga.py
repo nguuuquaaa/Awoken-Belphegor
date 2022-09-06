@@ -348,6 +348,48 @@ class IronSaga(commands.Cog):
             view.allowed_user = interaction.user
             await interaction.response.send_message(embed = view.embed_display(), view = view)
 
+    @ac.command(name = "skill")
+    @ac.describe(name = "Skill name")
+    async def skill(self, interaction: Interaction, name: str):
+        pilots = []
+        async for doc in self.bot.mongo.db.iron_saga_pilots.find(
+            {
+                "skills": {
+                    "$elemMatch": {
+                        "$or": utils.QueryHelper.broad_search(name, ["name", "effect"])
+                    }
+                }
+            },
+            projection = {
+                "_id": 0,
+                "en_name": 1,
+                "skills.$": 1
+            }
+        ):
+            pilots.append({"name": doc["en_name"], "skill": doc["skills"][0]})
+
+        if pilots:
+            class PilotPaginator(SingleRowPaginator):
+                class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
+                    placeholder = "Select pilot"
+
+                class PaginatorTemplate(SingleRowPaginator.PaginatorTemplate):
+                    title = f"Found {len(pilots)} pilots"
+                    colour = discord.Colour.blue()
+                    fields: Callable = lambda x, i: (
+                        x.value["name"],
+                        f"**{x.value['skill']['name']} {'[' + x.value['skill']['copilot'] + ']' if x.value['skill']['copilot'] else ''}**\n{x.value['skill']['effect']}",
+                        False
+                    )
+
+            items = [PageItem(value = pn) for pn in pilots]
+            paginator = PilotPaginator(items = items, page_size = 5, selectable =  False)
+            async for interaction, value in paginator.setup(interaction, timeout = 180):
+                pass
+
+        else:
+            await interaction.response.send_message(f"Cannot find skill with name: {name}")
+
     @ac.command(name = "part")
     @ac.describe(name = "Part name")
     async def get_part(self, interaction: Interaction, name: str):
