@@ -17,7 +17,7 @@ log = utils.get_logger()
 
 class StandardView(ui.View):
     allowed_user: discord.User
-    target_messages: list[discord.Message]
+    target_messages: set[discord.Message]
 
     def __init__(self, *, timeout: int | float = 180.0, allowed_user: discord.User = None):
         super().__init__(timeout = timeout)

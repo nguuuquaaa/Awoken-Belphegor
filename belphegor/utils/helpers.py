@@ -99,7 +99,7 @@ class ResponseHelper:
 
         target_messages = getattr(view, "target_messages", None)
         if target_messages is not None:
-            target_messages.append(self.target_message)
+            target_messages.add(self.target_message)
 
     async def thinking(self):
         """
