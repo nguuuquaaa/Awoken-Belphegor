@@ -17,10 +17,12 @@ log = utils.get_logger()
 
 class StandardView(ui.View):
     allowed_user: discord.User
+    target_messages: list[discord.Message]
 
     def __init__(self, *, timeout: int | float = 180.0, allowed_user: discord.User = None):
         super().__init__(timeout = timeout)
         self.allowed_user = allowed_user
+        self.target_messages = []
 
     def add_exit_button(self, row: int = 0) -> Self:
         self.add_item(ExitButton(row = row))
@@ -31,6 +33,12 @@ class StandardView(ui.View):
             return True
         else:
             return interaction.user == self.allowed_user
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        for message in self.target_messages:
+            await message.edit(view = self)
 
 #=============================================================================================================================#
 

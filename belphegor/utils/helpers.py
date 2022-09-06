@@ -97,6 +97,10 @@ class ResponseHelper:
                         allowed_mentions = allowed_mentions or None
                     )
 
+        target_messages = getattr(view, "target_messages", None)
+        if target_messages is not None:
+            target_messages.append(self.target_message)
+
     async def thinking(self):
         """
         Response with "Bot is thinking..."
