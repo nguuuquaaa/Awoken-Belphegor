@@ -14,21 +14,23 @@ from .selects import BaseSelect
 
 #=============================================================================================================================#
 
+log = utils.get_logger()
+
 _VT = TypeVar("_VT")
 _PageItem_VT = ForwardRef("PageItem[_VT]")
 
 #=============================================================================================================================#
 
 class EmbedTemplate(GenericModel, Generic[_VT]):
-    title: str = None
-    url: str = None
-    colour: discord.Colour = None
-    author: tuple[str, str | None, str | None] = None
-    thumbnail_url: str = None
-    image_url: str = None
-    footer: tuple[str, str | None] = None
-    description: str | Callable[[_PageItem_VT, int], str] = None
-    fields: Callable[[_PageItem_VT, int], tuple[str, str, bool]] = None
+    title: str | None = None
+    url: str | None = None
+    colour: discord.Colour | None = None
+    author: tuple[str, str | None, str | None] | None = None
+    thumbnail_url: str | None = None
+    image_url: str | None = None
+    footer: tuple[str, str | None] | None = None
+    description: str | Callable[[_PageItem_VT, int], str] | None = None
+    fields: tuple[str, str, bool] | Callable[[_PageItem_VT, int], tuple[str, str, bool]] | None = None
 
     separator: str = "\n"
 
@@ -133,6 +135,7 @@ class SingleRowPaginator(Generic[_VT]):
     pages: list[tuple[PageItem[_VT], ...]]
     page_amount: int
     current_index: int
+    selectable: bool
 
     class _HasPaginatorMixin:
         paginator: "SingleRowPaginator[_VT]"
@@ -210,24 +213,25 @@ class SingleRowPaginator(Generic[_VT]):
     class PaginatorTemplate(EmbedTemplate[_VT]):
         pass
 
-    def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]], *, page_size = 20):
+    def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]] | list[_VT], *, page_size = 20, selectable = True):
         if isinstance(items, PageItem):
             self.items = items.children
         else:
-            self.items = items
+            self.items = [item if isinstance(item, PageItem) else PageItem(value = item) for item in items]
 
         self.page_size = page_size
         self.pages = list(utils.grouper(self.items, page_size, incomplete = "missing"))
         self.page_amount = len(self.pages)
         self.current_index = 0
         self.queue = asyncio.Queue()
+        self.selectable = selectable
 
     def render(self, *, allowed_user: discord.User, timeout: int | float = 180.0) -> tuple[discord.Embed, PaginatorView]:
         current_items = self.pages[self.current_index]
         current_first_index = self.page_size * self.current_index
 
         template = self.PaginatorTemplate()
-        if template.description is None:
+        if template.description is None and template.fields is None:
             template.description = lambda item, index: f"{index + 1}. {item.value}"
         embed = template(current_items, current_first_index)
 
@@ -240,10 +244,13 @@ class SingleRowPaginator(Generic[_VT]):
         jump_backward_button = self.PaginatorJumpBackwardButton(row = 1)
         jump_to_button = self.PaginatorJumpToButton(label = f"Page {self.current_index + 1} of {self.page_amount}", row = 1)
 
-        select = self.PaginatorSelect(row = 0)
-        select.add_items_as_options(current_items, current_first_index)
+        if self.selectable:
+            select = self.PaginatorSelect(row = 0)
+            select.add_items_as_options(current_items, current_first_index)
+            view.add_item(select)
+        else:
+            view.add_exit_button(row = 2)
 
-        view.add_item(select)
         view.add_item(jump_backward_button)
         view.add_item(previous_button)
         view.add_item(jump_to_button)
@@ -254,7 +261,8 @@ class SingleRowPaginator(Generic[_VT]):
 
     async def setup(self, interaction: Interaction, *, timeout: int | float = 180.0) -> AsyncGenerator[tuple[Interaction, _VT]]:
         embed, view = self.render(allowed_user = interaction.user, timeout = timeout)
-        asyncio.create_task(interaction.response.send_message(embed = embed, view = view))
+        response = utils.ResponseHelper(interaction)
+        asyncio.create_task(response.send(embed = embed, view = view))
         while True:
             try:
                 interaction, value = await asyncio.wait_for(self.queue.get(), timeout = view.timeout)
