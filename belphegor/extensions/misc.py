@@ -41,7 +41,6 @@ class MathView(ContinuousInputView):
 class Misc(commands.Cog):
     def __init__(self, bot: Belphegor):
         self.bot = bot
-        self.pool = ProcessPoolExecutor(max_workers = 5)
 
     async def cog_unload(self):
         await asyncio.get_running_loop().run_in_executor(self.pool.shutdown(wait = True, cancel_futures = False))
@@ -97,7 +96,7 @@ class Misc(commands.Cog):
             inp = input.value
             try:
                 start = time.perf_counter()
-                r = await asyncio.get_running_loop().run_in_executor(self.pool, m.result, inp)
+                r = await asyncio.get_running_loop().run_in_executor(None, m.result, inp)
                 end = time.perf_counter()
                 time_taken = end - start
             except calculator.ParseError as e:
