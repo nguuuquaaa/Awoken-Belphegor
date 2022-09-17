@@ -8,6 +8,7 @@ from pydantic.generics import GenericModel
 
 from belphegor import utils
 from belphegor.ext_types import Interaction
+from .metas import MetaMergeClasstypeProperty
 from .views import StandardView
 from .buttons import NextButton, PreviousButton, JumpForwardButton, JumpBackwardButton, JumpToButton
 from .selects import BaseSelect
@@ -140,7 +141,7 @@ class SingleRowPaginator(Generic[_VT]):
     class _HasPaginatorMixin:
         paginator: "SingleRowPaginator[_VT]"
 
-    class PaginatorView(StandardView, _HasPaginatorMixin):
+    class PaginatorView(_HasPaginatorMixin, StandardView):
         def add_item(self, item: ui.Item) -> Self:
             item.paginator = self.paginator
             super().add_item(item)
@@ -148,35 +149,35 @@ class SingleRowPaginator(Generic[_VT]):
 
     _PV = TypeVar("_PV", bound = PaginatorView)
 
-    class PaginatorNextButton(NextButton[_PV], _HasPaginatorMixin):
+    class PaginatorNextButton(_HasPaginatorMixin, NextButton[_PV]):
         async def callback(self, interaction: Interaction):
             paginator = self.paginator
             paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + 1)
             embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
             await interaction.response.edit_message(embed = embed, view = view)
 
-    class PaginatorPreviousButton(PreviousButton[_PV], _HasPaginatorMixin):
+    class PaginatorPreviousButton(_HasPaginatorMixin, PreviousButton[_PV]):
         async def callback(self, interaction: Interaction):
             paginator = self.paginator
             paginator.current_index = max(0, paginator.current_index - 1)
             embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
             await interaction.response.edit_message(embed = embed, view = view)
 
-    class PaginatorJumpForwardButton(JumpForwardButton[_PV], _HasPaginatorMixin):
+    class PaginatorJumpForwardButton(_HasPaginatorMixin, JumpForwardButton[_PV]):
         async def callback(self, interaction: Interaction):
             paginator = self.paginator
             paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + self.jump)
             embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
             await interaction.response.edit_message(embed = embed, view = view)
 
-    class PaginatorJumpBackwardButton(JumpBackwardButton[_PV], _HasPaginatorMixin):
+    class PaginatorJumpBackwardButton(_HasPaginatorMixin, JumpBackwardButton[_PV]):
         async def callback(self, interaction: Interaction):
             paginator = self.paginator
             paginator.current_index = max(0, paginator.current_index - self.jump)
             embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
             await interaction.response.edit_message(embed = embed, view = view)
 
-    class PaginatorJumpToButton(JumpToButton[_PV], _HasPaginatorMixin):
+    class PaginatorJumpToButton(_HasPaginatorMixin, JumpToButton[_PV]):
         async def callback(self, interaction: Interaction):
             paginator = self.paginator
             asyncio.create_task(interaction.response.send_modal(self.create_modal()))
@@ -194,7 +195,7 @@ class SingleRowPaginator(Generic[_VT]):
                 embed, view = paginator.render(allowed_user = interaction.user, timeout = self.view.timeout)
                 await interaction.response.edit_message(embed = embed, view = view)
 
-    class PaginatorSelect(BaseSelect[_PV], _HasPaginatorMixin):
+    class PaginatorSelect(_HasPaginatorMixin, BaseSelect[_PV]):
         placeholder = "Select"
         min_values = 1
         max_values = 1

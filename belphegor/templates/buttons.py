@@ -1,17 +1,18 @@
 import discord
-from discord.ui import Button, View, Modal, TextInput
+from discord import ui, utils
 from discord.enums import ButtonStyle
 from discord.utils import MISSING
 from collections.abc import AsyncGenerator
-from typing import TypeVar, TypeAlias
-from typing_extensions import Self
+from typing import TypeVar, TypeAlias, TYPE_CHECKING
 import asyncio
 from functools import cached_property
-from pydantic import Field, BaseModel
+from pydantic import Field
 
 from belphegor import utils
 from belphegor.ext_types import Interaction
-from .metas import BaseItem
+from .metas import BaseItem, MetaMergeClasstypeProperty
+from .text_inputs import TextInput
+from .modals import Modal
 
 #=============================================================================================================================#
 
@@ -19,11 +20,11 @@ log = utils.get_logger()
 
 #=============================================================================================================================#
 
-_V = TypeVar("_V", bound = View, covariant = True)
+_V = TypeVar("_V", bound = ui.View, covariant = True)
 
 EmojiType: TypeAlias = str | discord.Emoji | discord.PartialEmoji
 
-class BaseButton(BaseItem, Button[_V]):
+class BaseButton(BaseItem, ui.Button[_V]):
     __custom_ui_init_fields__ = ["custom_id", "label", "emoji", "style", "url", "row", "disabled"]
 
     custom_id: str = None
@@ -40,14 +41,18 @@ class InputButton(BaseButton[_V]):
     style: ButtonStyle = ButtonStyle.primary
     queue: asyncio.Queue[tuple[Interaction, TextInput[_V]]] = Field(init = False)
 
-    class InputModal(Modal, title = "Input"):
-        view: _V
+    class InputModal(Modal, metaclass = MetaMergeClasstypeProperty):
+        title: str = "Input"
         queue: asyncio.Queue[tuple[Interaction, TextInput[_V]]]
+        input: "ModalTextInput[_V]"
 
-        input = TextInput[_V](
-            label = "Input",
-            style = discord.TextStyle.long
-        )
+        class ModalTextInput(TextInput[_V]):
+            label: str = "Input"
+            style: discord.TextStyle = discord.TextStyle.long
+
+        def __post_init__(self):
+            self.input = self.ModalTextInput()
+            self.add_item(self.input)
 
         async def on_submit(self, interaction: Interaction):
             await self.queue.put((interaction, self.input))
@@ -58,21 +63,21 @@ class InputButton(BaseButton[_V]):
     def create_modal(self, *, title: str = MISSING, custom_id: str = MISSING) -> InputModal:
         modal = self.InputModal(title = title, timeout = self.view.timeout, custom_id = custom_id)
         modal.queue = self.queue
-        modal.view = self.view
         return modal
 
     async def callback(self, interaction: Interaction):
         modal = self.create_modal()
         await interaction.response.send_modal(modal)
 
-    async def wait_for_inputs(self) -> AsyncGenerator[tuple[Interaction, TextInput[_V]]]:
+    async def wait_for_inputs(self) -> AsyncGenerator[tuple[Interaction, "InputModal.ModalTextInput[_V]"]]:
         while not self.disabled:
-            try:
-                interaction, text_input = await asyncio.wait_for(self.queue.get(), timeout = self.view.timeout)
-            except asyncio.TimeoutError:
+            done, pending = await asyncio.wait([self.queue.get(), self.view.wait()], return_when = asyncio.FIRST_COMPLETED)
+            ret = tuple(done)[0].result()
+            if isinstance(ret, bool):
+                asyncio.create_task(self.queue.put(None))
                 return
             else:
-                yield interaction, text_input
+                yield ret
 
 class HomeButton(BaseButton[_V]):
     label: str = "Home"
@@ -130,32 +135,32 @@ class JumpToButton(InputButton[_V]):
     label: str = "Jump to"
     emoji: EmojiType = "\u23fa"
     style: ButtonStyle = ButtonStyle.secondary
-    queue: asyncio.Queue[tuple[Interaction, "InputModal.IntTextInput[_V]"]] = Field(init = False)
+    queue: asyncio.Queue[tuple[Interaction, "InputModal.TextInput[_V]"]] = Field(init = False)
 
-    class InputModal(InputButton.InputModal):
-        queue: asyncio.Queue[tuple[Interaction, "IntTextInput[_V]"]]
+    class InputModal(Modal):
+        label = "Jump"
 
-        class IntTextInput(TextInput[_V]):
+        class ModalTextInput(TextInput):
+            label = "Jump to page"
+            style = discord.TextStyle.short
+
             @cached_property
             def int_value(self):
                 return int(self.value)
 
-        input = IntTextInput[_V](
-            label = "Jump to page",
-            style = discord.TextStyle.short
-        )
-
-    async def wait_for_inputs(self) -> AsyncGenerator[tuple[Interaction, InputModal.IntTextInput[_V]]]:
+    async def wait_for_inputs(self) -> AsyncGenerator[tuple[Interaction, "InputModal.ModalTextInput[_V]"]]:
         while not self.disabled:
-            try:
-                interaction, text_input = await asyncio.wait_for(self.queue.get(), timeout = self.view.timeout)
-            except asyncio.TimeoutError:
+            done, pending = await asyncio.wait([self.queue.get(), self.view.wait()], return_when = asyncio.FIRST_COMPLETED)
+            ret = tuple(done)[0].result()
+            if isinstance(ret, bool):
+                asyncio.create_task(self.queue.put(None))
                 return
             else:
+                interaction, text_input = ret
                 try:
                     text_input.int_value
                 except ValueError:
-                    asyncio.create_task(interaction.response.edit_message(content = "Hey, the input value isn't even an integer.", view = self.view))
+                    asyncio.create_task(interaction.response.edit_message())
                 else:
                     yield interaction, text_input
 

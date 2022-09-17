@@ -8,6 +8,7 @@ from typing_extensions import Self
 from belphegor import utils
 from belphegor.ext_types import Interaction
 from .buttons import InputButton as OrigInputButton, ExitButton
+from .metas import MetaMergeClasstypeProperty
 
 #=============================================================================================================================#
 
@@ -22,7 +23,7 @@ class StandardView(ui.View):
     def __init__(self, *, timeout: int | float = 180.0, allowed_user: discord.User = None):
         super().__init__(timeout = timeout)
         self.allowed_user = allowed_user
-        self.target_messages = []
+        self.target_messages = set()
 
     def add_exit_button(self, row: int = 0) -> Self:
         self.add_item(ExitButton(row = row))
@@ -44,7 +45,7 @@ class StandardView(ui.View):
 
 _CV = TypeVar("_CV", bound = ForwardRef("ContinuousInputView"))
 
-class ContinuousInputView(StandardView):
+class ContinuousInputView(StandardView, metaclass = MetaMergeClasstypeProperty):
     input_button: "InputButton"
 
     class InputButton(OrigInputButton[_CV]):
@@ -56,7 +57,7 @@ class ContinuousInputView(StandardView):
         self.add_item(self.input_button)
         self.add_exit_button()
 
-    async def setup(self, interaction: Interaction) -> AsyncGenerator[tuple[Interaction, ui.TextInput]]:
+    async def setup(self, interaction: Interaction) -> AsyncGenerator[tuple[Interaction, InputButton.InputModal.ModalTextInput]]:
         modal = self.input_button.create_modal()
         asyncio.create_task(interaction.response.send_modal(modal))
         async for interaction, input in self.input_button.wait_for_inputs():
