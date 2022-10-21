@@ -10,9 +10,9 @@ from pydantic import Field
 
 from belphegor import utils
 from belphegor.ext_types import Interaction
-from .metas import BaseItem, MetaMergeClasstypeProperty
 from .text_inputs import TextInput
 from .modals import Modal
+from ..metas import BaseItem, MetaMergeClasstypeProperty
 
 #=============================================================================================================================#
 

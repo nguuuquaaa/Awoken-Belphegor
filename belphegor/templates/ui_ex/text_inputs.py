@@ -3,7 +3,7 @@ from discord.ui import Button, View, Modal, TextInput
 from typing import TypeVar
 
 from belphegor import utils
-from .metas import BaseItem
+from ..metas import BaseItem
 
 #=============================================================================================================================#
 

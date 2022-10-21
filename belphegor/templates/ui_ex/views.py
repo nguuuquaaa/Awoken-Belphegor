@@ -8,7 +8,7 @@ from typing_extensions import Self
 from belphegor import utils
 from belphegor.ext_types import Interaction
 from .buttons import InputButton as OrigInputButton, ExitButton
-from .metas import MetaMergeClasstypeProperty
+from ..metas import MetaMergeClasstypeProperty
 
 #=============================================================================================================================#
 
