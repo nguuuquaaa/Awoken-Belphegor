@@ -13,7 +13,7 @@ _V = typing.TypeVar("_V", bound = views.StandardView, covariant = True)
 
 EmojiType: typing.TypeAlias = str | discord.Emoji | discord.PartialEmoji
 
-class Button(items.Item, ui.Button[_V]):
+class Button(items.Item[_V], ui.Button[_V]):
     __custom_ui_init_fields__ = ["custom_id", "label", "emoji", "style", "url", "row", "disabled"]
 
     custom_id: str = None

@@ -9,7 +9,7 @@ from . import views, items
 
 _V = TypeVar("_V", bound = views.StandardView, covariant = True)
 
-class Select(items.Item, ui.Select[_V]):
+class Select(items.Item[_V], ui.Select[_V]):
     __custom_ui_init_fields__ = ["custom_id", "placeholder", "min_values", "max_values", "options", "row", "disabled"]
 
     custom_id: str = MISSING
