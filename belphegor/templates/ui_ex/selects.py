@@ -3,7 +3,7 @@ from discord import ui
 from discord.utils import MISSING
 from typing import TypeVar
 
-from ..metas import BaseItem
+from .metas import BaseItem
 
 #=============================================================================================================================#
 

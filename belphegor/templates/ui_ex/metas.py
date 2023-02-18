@@ -1,6 +1,4 @@
-from discord.utils import MISSING
 from pydantic.fields import Field, FieldInfo
-import inspect
 
 from belphegor import utils
 
@@ -59,7 +57,6 @@ class MetaMergeClasstypeProperty(type):
                     namespace[key] = __custom_ui_init_items__
 
         cls = type(name, tuple(classes), namespace)
-        log.debug(getattr(cls, "title", "xxx"))
         return cls
 
     def __new__(meta, name, bases, namespace, **kwargs):
@@ -77,6 +74,7 @@ class MetaMergeClasstypeProperty(type):
         namespace.update(to_be_merged)
         return super().__new__(meta, name, bases, namespace, **kwargs)
 
+@utils.__dataclass_transform__(kw_only_default = True, field_specifiers = (Field, FieldInfo))
 class MetaMergeClasstypePropertyItem(MetaItem, MetaMergeClasstypeProperty):
     pass
 
@@ -87,7 +85,7 @@ class PostInitable:
         if post_init:
             post_init()
 
-class BaseItem(PostInitable, metaclass = MetaMergeClasstypePropertyItem):
+class BaseItem(PostInitable, metaclass = MetaItem):
     def __init__(self, **kwargs):
         new_kwargs = {**self.__custom_ui_init_items__, **kwargs}
         super().__init__(**new_kwargs)
