@@ -3,11 +3,12 @@ from discord import ui
 from discord.utils import MISSING
 from typing import TypeVar
 
+from . import views
 from .metas import BaseItem
 
 #=============================================================================================================================#
 
-_V = TypeVar("_V", bound = ui.View)
+_V = TypeVar("_V", bound = views.StandardView, covariant = True)
 
 class BaseSelect(BaseItem, ui.Select[_V]):
     __custom_ui_init_fields__ = ["custom_id", "placeholder", "min_values", "max_values", "options", "row", "disabled"]

@@ -1,18 +1,16 @@
 import discord
-from discord import ui, utils
+from discord import ui
 import typing
 from functools import cached_property
 import abc
 
-from belphegor import utils
 from belphegor.ext_types import Interaction
-from .text_inputs import TextInput
-from .modals import Modal
+from . import views, text_inputs, modals
 from .metas import BaseItem
 
 #=============================================================================================================================#
 
-_V = typing.TypeVar("_V", bound = ui.View, covariant = True)
+_V = typing.TypeVar("_V", bound = views.StandardView, covariant = True)
 
 EmojiType: typing.TypeAlias = str | discord.Emoji | discord.PartialEmoji
 
@@ -32,11 +30,11 @@ class InputButton(BaseButton[_V]):
     emoji: EmojiType = "\U0001f4dd"
     style: discord.ButtonStyle = discord.ButtonStyle.primary
 
-    class InputModal(Modal):
+    class InputModal(modals.Modal):
         title: str = "Input"
         input_text_box: "InputTextBox"
 
-        class InputTextBox(TextInput[_V]):
+        class InputTextBox(text_inputs.TextInput[_V]):
             label: str = "Input"
             style: discord.TextStyle = discord.TextStyle.long
 
