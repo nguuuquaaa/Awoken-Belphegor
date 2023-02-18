@@ -5,8 +5,7 @@ from functools import cached_property
 import abc
 
 from belphegor.ext_types import Interaction
-from . import views, text_inputs, modals
-from .metas import BaseItem
+from . import views, items, text_inputs, modals
 
 #=============================================================================================================================#
 
@@ -14,7 +13,7 @@ _V = typing.TypeVar("_V", bound = views.StandardView, covariant = True)
 
 EmojiType: typing.TypeAlias = str | discord.Emoji | discord.PartialEmoji
 
-class BaseButton(BaseItem, ui.Button[_V]):
+class Button(items.Item, ui.Button[_V]):
     __custom_ui_init_fields__ = ["custom_id", "label", "emoji", "style", "url", "row", "disabled"]
 
     custom_id: str = None
@@ -25,7 +24,7 @@ class BaseButton(BaseItem, ui.Button[_V]):
     row: int = None
     disabled: bool = False
 
-class InputButton(BaseButton[_V]):
+class InputButton(Button[_V]):
     label: str = "Input"
     emoji: EmojiType = "\U0001f4dd"
     style: discord.ButtonStyle = discord.ButtonStyle.primary
@@ -50,12 +49,12 @@ class InputButton(BaseButton[_V]):
         modal = self.InputModal(timeout = self.view.timeout)
         await interaction.response.send_modal(modal)
 
-class HomeButton(BaseButton[_V]):
+class HomeButton(Button[_V]):
     label: str = "Home"
     emoji: EmojiType = "\U0001f3e0"
     style: discord.ButtonStyle = discord.ButtonStyle.primary
 
-class ExitButton(BaseButton[_V]):
+class ExitButton(Button[_V]):
     label: str = "Exit"
     emoji: EmojiType = "\u274c"
     style: discord.ButtonStyle = discord.ButtonStyle.secondary
@@ -68,35 +67,35 @@ class ExitButton(BaseButton[_V]):
 
         await interaction.response.edit_message(view = self.view)
 
-class ConfirmedButton(BaseButton[_V]):
+class ConfirmedButton(Button[_V]):
     label: str = None
     emoji: EmojiType = "\u2705"
     style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
-class DeniedButton(BaseButton[_V]):
+class DeniedButton(Button[_V]):
     label: str = None
     emoji: EmojiType = "\u2716"
     style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
 #=============================================================================================================================#
 
-class NextButton(BaseButton[_V]):
+class NextButton(Button[_V]):
     label: str = None
     emoji: EmojiType = "\u25b6"
     style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
-class PreviousButton(BaseButton[_V]):
+class PreviousButton(Button[_V]):
     label: str = None
     emoji: EmojiType = "\u25c0"
     style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
-class JumpForwardButton(BaseButton[_V]):
+class JumpForwardButton(Button[_V]):
     jump: int = 5
     label: str = "Forward 5"
     emoji: EmojiType = "\u23e9"
     style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
-class JumpBackwardButton(BaseButton[_V]):
+class JumpBackwardButton(Button[_V]):
     jump: int = 5
     label: str = "Back 5"
     emoji: EmojiType = "\u23ea"
@@ -125,17 +124,17 @@ class JumpToButton(InputButton[_V]):
 
 #=============================================================================================================================#
 
-class StatsButton(BaseButton[_V]):
+class StatsButton(Button[_V]):
     label: str = "Stats"
     emoji: EmojiType = None
     style: discord.ButtonStyle = discord.ButtonStyle.primary
 
-class TriviaButton(BaseButton[_V]):
+class TriviaButton(Button[_V]):
     label: str = "Trivia"
     emoji: EmojiType = "\U0001f5d2"
     style: discord.ButtonStyle = discord.ButtonStyle.primary
 
-class SkinsButton(BaseButton[_V]):
+class SkinsButton(Button[_V]):
     label: str = "Skins"
     emoji: EmojiType = "\U0001f5bc"
     style: discord.ButtonStyle = discord.ButtonStyle.primary

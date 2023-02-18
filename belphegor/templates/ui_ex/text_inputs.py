@@ -2,14 +2,13 @@ import discord
 from discord import ui
 from typing import TypeVar
 
-from . import views
-from .metas import BaseItem
+from . import views, items
 
 #=============================================================================================================================#
 
 _V = TypeVar("_V", bound = views.StandardView, covariant = True)
 
-class TextInput(BaseItem, ui.TextInput[_V]):
+class TextInput(items.Item, ui.TextInput[_V]):
     __custom_ui_init_fields__ = ["custom_id", "label", "style", "placeholder", "default", "required", "min_length", "max_length", "row"]
 
     custom_id: str = None
