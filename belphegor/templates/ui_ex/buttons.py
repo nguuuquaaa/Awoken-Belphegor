@@ -42,7 +42,7 @@ class InputButton(Button[_V]):
             self.add_item(self.input_text_box)
 
         @abc.abstractmethod
-        def on_submit(self, interaction: Interaction):
+        async def on_submit(self, interaction: Interaction):
             pass
 
     async def callback(self, interaction: Interaction):
@@ -119,7 +119,7 @@ class JumpToButton(InputButton[_V]):
                 return int(self.value)
 
         @abc.abstractmethod
-        def on_submit(self, interaction: Interaction):
+        async def on_submit(self, interaction: Interaction):
             return self.input_text_box.int_value
 
 #=============================================================================================================================#
