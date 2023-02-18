@@ -14,8 +14,8 @@ services:
     command: python3.10 run.py
     restart: always
     environment:
-      - LOGGER=belphegor
-      - LOG_LEVEL=DEBUG
+      LOGGER: belphegor
+      LOG_LEVEL: DEBUG
     volumes:
       - .:/bel
     working_dir: /bel
