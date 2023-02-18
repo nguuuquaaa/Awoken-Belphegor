@@ -10,8 +10,8 @@ import functools
 #=============================================================================================================================#
 
 _T = TypeVar("_T")
-_P = ParamSpec("_P")
 _R = TypeVar("_R")
+_P = ParamSpec("_P")
 
 def copy_signature(func: Callable[_P, _R]) -> Callable[[Callable], Callable[_P, _R]]:
     def wrapper(f: Callable):

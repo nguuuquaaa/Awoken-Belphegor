@@ -53,8 +53,8 @@ def clean_codeblock(text: str) -> str:
     text = text.strip("` \n\r\t\v\f")
     return text
 
-def safe_url(any_url):
-    return quote(any_url, safe=r":/&$+,;=@#~%?")
+def safe_url(any_url: str) -> str:
+    return quote(any_url, safe = r":/&$+,;=@#~%?")
 
 _format_regex = re.compile(r"(?<!\\)\{([^\\]+?)\}")
 def safe_format(text: str, **kwargs) -> str:
@@ -85,7 +85,7 @@ def split_iter(txt: str, *, check: Callable[[str], bool] = str.isspace, keep_del
         if word:
             yield "".join(word)
 
-def split_page(text: str, split_len: int, *, check: Callable[[str], bool] = str.isspace, safe_mode: bool = True, fix = "...", strip: str = None):
+def split_page(text: str, split_len: int, *, check: Callable[[str], bool] = str.isspace, safe_mode: bool = True, fix = "...", strip: str = None) -> list[str]:
     if not text:
         return [""]
     description_page = []

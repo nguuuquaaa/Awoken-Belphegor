@@ -1,10 +1,13 @@
 import asyncio
-from typing import TypeVar
+from typing import TypeVar, Generic
 from collections.abc import AsyncIterator, AsyncIterable, Iterable, Awaitable
+import collections
 
 #=============================================================================================================================#
 
 _T = TypeVar("_T")
+_S = TypeVar("_S")
+
 class AsyncIterWrapper(AsyncIterator[_T]):
     def __init__(self, coro: Awaitable[Iterable[_T]]):
         async def do_stuff():
@@ -18,6 +21,23 @@ class AsyncIterWrapper(AsyncIterator[_T]):
 
     async def __anext__(self) -> _T:
         return await self.coro.__anext__()
+
+class WorkItem(Generic[_T, _S]):
+    def __init__(self, item: _T):
+        self.item = item
+        self.result = asyncio.Future()
+
+    def set_result(self, item: _S):
+        self.result.set_result(item)
+
+class WorkQueue(Generic[_T, _S]):
+    def __init__(self):
+        self._queue = collections.deque()
+
+    async def work(self, item: _T) -> _S:
+        ...
+
+#=============================================================================================================================#
 
 async def async_iter(iterable: Iterable[_T] | AsyncIterable[_T]) -> AsyncIterator[_T]:
     if isinstance(iterable, Iterable):
