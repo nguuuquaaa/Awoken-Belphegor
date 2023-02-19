@@ -32,7 +32,7 @@ class Panel:
 
     @view.setter
     def view(self, value: ui_ex.StandardView):
-        if value is not None:
+        if value:
             value.panel = self
         self._view = value
 

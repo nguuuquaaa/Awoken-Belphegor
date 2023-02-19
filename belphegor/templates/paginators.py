@@ -127,13 +127,13 @@ PageItem.update_forward_refs()
 
 #=============================================================================================================================#
 
-class BasePaginator(ui_ex.PostInitable):
+class BasePaginator():
     panel: Panel
 
     class PaginatorView(ui_ex.StandardView):
         paginator: "BasePaginator"
 
-    def __post_init__(self):
+    def __init__(self):
         self.panel = Panel()
 
     async def update(self, interaction: Interaction):
@@ -227,6 +227,7 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
         pass
 
     def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]] | list[_VT], *, page_size = 20, selectable = False):
+        super().__init__()
         if isinstance(items, PageItem):
             self.items = items.children
         else:
@@ -293,14 +294,17 @@ class ContinuousInput(BasePaginator):
             class ContinuousInputTextBox(ui_ex.InputButton.InputModal.InputTextBox):
                 pass
 
+    _continuous_input_button: ContinuousInputButton
+
     def render(self):
         if not self.panel.view:
             view = self.PaginatorView()
-            view.add_item(self.ContinuousInputButton())
+            self._continuous_input_button = self.ContinuousInputButton()
+            view.add_item(self._continuous_input_button)
             view.add_exit_button()
             self.panel.view = view
 
     async def initialize(self, interaction: Interaction):
         self.render()
         self.panel.view.allowed_user = interaction.user
-        await interaction.response.send_modal(self.ContinuousInputButton().create_modal())
+        await interaction.response.send_modal(self._continuous_input_button.create_modal())

@@ -37,4 +37,4 @@ class StandardView(PostInitable, ui.View):
             item.disabled = True
 
         if self.panel.target_message:
-            await self.panel.reply(view = self)
+            await self.panel.target_message.edit(view = self)
