@@ -292,7 +292,8 @@ class ContinuousInput(BasePaginator):
 
     class ContinuousInputButton(ui_ex.InputButton[_CIV]):
         class ContinuousInputModal(ui_ex.InputButton.InputModal):
-            pass
+            class ContinuousInputTextBox(ui_ex.InputButton.InputModal.InputTextBox):
+                pass
 
     def render(self):
         if not self.panel.view:

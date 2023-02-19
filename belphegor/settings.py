@@ -14,7 +14,9 @@ class BelphegorSettings(BaseSettings):
     GFWIKI_BOT_USERNAME: str
     GFWIKI_BOT_PASSWORD: str
 
+    LOG_CHANNEL_ID: int
+
     LOGGER: str = "belphegor"
     LOG_LEVEL: str = "DEBUG"
 
-settings = BelphegorSettings(_env_file=".env", _env_file_encoding="utf-8")
+settings = BelphegorSettings(_env_file = ".env", _env_file_encoding = "utf-8")
