@@ -1,14 +1,11 @@
 import discord
 from discord import ui
 import typing
-from typing_extensions import Self
 from functools import cached_property
 import abc
 
 from . import views, items, text_inputs, modals
-
-if typing.TYPE_CHECKING:
-    from ..discord_types import Interaction
+from ..discord_types import Interaction
 
 #=============================================================================================================================#
 

@@ -1,13 +1,13 @@
 import discord
 from discord import ui
 from discord.utils import MISSING
-from typing import TypeVar
+import typing
 
 from . import views, items
 
 #=============================================================================================================================#
 
-_V = TypeVar("_V", bound = views.StandardView, covariant = True)
+_V = typing.TypeVar("_V", bound = views.StandardView, covariant = True)
 
 class Select(items.Item[_V], ui.Select[_V]):
     __custom_ui_init_fields__ = ["custom_id", "placeholder", "min_values", "max_values", "options", "row", "disabled"]

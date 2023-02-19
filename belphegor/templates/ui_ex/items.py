@@ -1,7 +1,7 @@
 from discord import ui
 import typing
 
-from . import views
+from. import views
 from .metas import BaseItem
 
 #=============================================================================================================================#

@@ -3,11 +3,10 @@ from discord import ui
 import typing
 from typing_extensions import Self
 
-from . import buttons
 from .metas import PostInitable
+from ..discord_types import Interaction
 
 if typing.TYPE_CHECKING:
-    from ..discord_types import Interaction
     from ..panels import Panel
 
 #=============================================================================================================================#
@@ -22,6 +21,7 @@ class StandardView(PostInitable, ui.View):
         self.target_messages = set()
 
     def add_exit_button(self, row: int = 0) -> Self:
+        from . import buttons
         self.add_item(buttons.ExitButton(row = row))
         return self
 
