@@ -1,6 +1,7 @@
 import discord
 from discord import ui
 import typing
+from typing_extensions import Self
 from functools import cached_property
 import abc
 
@@ -33,9 +34,10 @@ class InputButton(Button[_V]):
 
     class InputModal(modals.Modal):
         title: str = "Input"
+        view: _V
         input_text_box: "InputTextBox"
 
-        class InputTextBox(text_inputs.TextInput[_V]):
+        class InputTextBox(text_inputs.TextInput):
             label: str = "Input"
             style: discord.TextStyle = discord.TextStyle.long
 
@@ -48,7 +50,9 @@ class InputButton(Button[_V]):
             pass
 
     def create_modal(self):
-        return self.InputModal(timeout = self.view.timeout)
+        modal = self.InputModal(timeout = self.view.timeout)
+        modal.view = self.view
+        return modal
 
     async def callback(self, interaction: Interaction):
         modal = self.create_modal()

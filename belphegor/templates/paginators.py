@@ -1,5 +1,6 @@
 import discord
 import typing
+from typing_extensions import Self
 from collections.abc import Callable
 import asyncio
 from pydantic.generics import GenericModel
@@ -128,8 +129,33 @@ PageItem.update_forward_refs()
 
 #=============================================================================================================================#
 
-class SingleRowPaginator(typing.Generic[_VT]):
+class BasePaginator(ui_ex.PostInitable):
     panel: Panel
+
+    class PaginatorView(ui_ex.StandardView):
+        paginator: "BasePaginator"
+
+    def __post_init__(self):
+        self.panel = Panel()
+
+    async def update(self, interaction: Interaction):
+        await self.panel.reply(interaction)
+
+    @abc.abstractmethod
+    def render(self) -> Panel:
+        return self.panel
+
+    async def initialize(self, interaction: Interaction):
+        self.render()
+        self.panel.view.allowed_user = interaction.user
+        await self.update(interaction)
+
+#=============================================================================================================================#
+
+_SRP = typing.TypeVar("_SRP", bound = "SingleRowPaginator")
+_SRPV = typing.TypeVar("_SRPV", bound = "SingleRowPaginator.PaginatorView")
+
+class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
     items: list[PageItem[_VT]]
     page_size: int
     pages: list[tuple[PageItem[_VT], ...]]
@@ -137,43 +163,43 @@ class SingleRowPaginator(typing.Generic[_VT]):
     current_index: int
     selectable: bool
 
-    class PaginatorView(ui_ex.StandardView):
-        paginator: "SingleRowPaginator[_VT]"
+    class PaginatorView(BasePaginator.PaginatorView):
+        paginator: _SRP
 
-    class PaginatorNextButton(ui_ex.NextButton[PaginatorView]):
+    class PaginatorNextButton(ui_ex.NextButton[_SRPV]):
         async def callback(self, interaction: Interaction):
             paginator = self.view.paginator
             paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + 1)
             paginator.render()
             await paginator.update(interaction)
 
-    class PaginatorPreviousButton(ui_ex.PreviousButton[PaginatorView]):
+    class PaginatorPreviousButton(ui_ex.PreviousButton[_SRPV]):
         async def callback(self, interaction: Interaction):
             paginator = self.view.paginator
             paginator.current_index = max(0, paginator.current_index - 1)
             paginator.render()
             await paginator.update(interaction)
 
-    class PaginatorJumpForwardButton(ui_ex.JumpForwardButton[PaginatorView]):
+    class PaginatorJumpForwardButton(ui_ex.JumpForwardButton[_SRPV]):
         async def callback(self, interaction: Interaction):
             paginator = self.view.paginator
             paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + self.jump)
             paginator.render()
             await paginator.update(interaction)
 
-    class PaginatorJumpBackwardButton(ui_ex.JumpBackwardButton[PaginatorView]):
+    class PaginatorJumpBackwardButton(ui_ex.JumpBackwardButton[_SRPV]):
         async def callback(self, interaction: Interaction):
             paginator = self.view.paginator
             paginator.current_index = max(0, paginator.current_index - self.jump)
             paginator.render()
             await paginator.update(interaction)
 
-    class PaginatorJumpToButton(ui_ex.JumpToButton[PaginatorView]):
+    class PaginatorJumpToButton(ui_ex.JumpToButton[_SRPV]):
         class PaginatorModal(ui_ex.JumpToButton.InputModal):
-            paginator: "SingleRowPaginator[_VT]"
+            view: _SRPV
 
             async def on_submit(self, interaction: Interaction):
-                paginator = self.paginator
+                paginator = self.view.paginator
                 try:
                     target_index = self.input_text_box.int_value - 1
                 except ValueError:
@@ -183,12 +209,7 @@ class SingleRowPaginator(typing.Generic[_VT]):
                     paginator.render()
                     await paginator.update(interaction)
 
-        def create_modal(self):
-            modal = super().create_modal()
-            modal.paginator = self.view.paginator
-            return modal
-
-    class PaginatorSelect(ui_ex.Select[PaginatorView]):
+    class PaginatorSelect(ui_ex.Select[_SRPV]):
         placeholder: str = "Select"
         min_values: int = 1
         max_values: int = 1
@@ -208,8 +229,6 @@ class SingleRowPaginator(typing.Generic[_VT]):
         pass
 
     def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]] | list[_VT], *, page_size = 20, selectable = False):
-        self.panel = Panel()
-
         if isinstance(items, PageItem):
             self.items = items.children
         else:
@@ -262,10 +281,27 @@ class SingleRowPaginator(typing.Generic[_VT]):
 
         return self.panel
 
-    async def update(self, interaction: Interaction):
-        await self.panel.reply(interaction)
+#=============================================================================================================================#
+
+_CI = typing.TypeVar("_CI", bound = "ContinuousInput")
+_CIV = typing.TypeVar("_CIV", bound = "ContinuousInput.PaginatorView")
+
+class ContinuousInput(BasePaginator):
+    class PaginatorView(BasePaginator.PaginatorView):
+        paginator: _CI
+
+    class ContinuousInputButton(ui_ex.InputButton[_CIV]):
+        class ContinuousInputModal(ui_ex.InputButton.InputModal):
+            pass
+
+    def render(self):
+        if not self.panel.view:
+            view = self.PaginatorView()
+            view.add_item(self.ContinuousInputButton())
+            view.add_exit_button()
+            self.panel.view = view
 
     async def initialize(self, interaction: Interaction):
         self.render()
         self.panel.view.allowed_user = interaction.user
-        await self.update(interaction)
+        await interaction.response.send_modal(self.ContinuousInputButton().create_modal())
