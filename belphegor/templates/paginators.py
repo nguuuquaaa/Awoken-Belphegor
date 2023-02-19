@@ -9,9 +9,7 @@ import abc
 from belphegor import utils
 from . import ui_ex
 from .panels import Panel
-
-if typing.TYPE_CHECKING:
-    from .discord_types import Interaction
+from .discord_types import Interaction
 
 #=============================================================================================================================#
 

@@ -1,9 +1,8 @@
 import discord
 import typing
 
-if typing.TYPE_CHECKING:
-    from collections.abc import Callable
-    from .discord_types import Interaction
+from collections.abc import Callable
+from .discord_types import Interaction
 
 #=============================================================================================================================#
 

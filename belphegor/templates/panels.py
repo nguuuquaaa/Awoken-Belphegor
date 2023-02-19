@@ -1,13 +1,11 @@
 import discord
 from discord.utils import MISSING
 import typing
+from collections.abc import Sequence
 
 from belphegor import utils
 from . import ui_ex
-
-if typing.TYPE_CHECKING:
-    from collections.abc import Sequence
-    from .discord_types import Interaction
+from .discord_types import Interaction
 
 #=============================================================================================================================#
 
@@ -33,7 +31,7 @@ class Panel:
         return self._view
 
     @view.setter
-    def set_view(self, value: ui_ex.StandardView):
+    def view(self, value: ui_ex.StandardView):
         if value is not None:
             value.panel = self
         self._view = value
