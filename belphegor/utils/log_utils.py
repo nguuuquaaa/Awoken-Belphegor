@@ -8,21 +8,14 @@ from belphegor.settings import settings
 
 def get_logger():
     log = logging.getLogger(settings.LOGGER)
+    log_level = getattr(logging, settings.LOG_LEVEL.upper(), "ERROR")
+    log.setLevel(log_level)
     if not log.handlers:
-        log.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), "ERROR"))
-
-        file_handler = TimedRotatingFileHandler(
-            filename = f"./logs/{settings.LOGGER}.log",
-            when = "midnight",
-            encoding = "utf-8",
-            utc = True,
-            backupCount = 7
-        )
-        file_handler.suffix = "%Y-%m-%d"
-        file_handler.namer = lambda name: name.replace(".log", "") + ".log"
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        file_handler.setFormatter(formatter)
-
-        log.addHandler(file_handler)
+        handler = logging.StreamHandler()
+        handler.setLevel(log_level)
+        handler.setStream(sys.stdout)
+        formatter = logging.Formatter(settings.LOG_FORMAT)
+        handler.setFormatter(formatter)
+        log.addHandler(handler)
 
     return log

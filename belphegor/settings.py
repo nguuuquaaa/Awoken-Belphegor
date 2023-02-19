@@ -18,5 +18,6 @@ class BelphegorSettings(BaseSettings):
 
     LOGGER: str = "belphegor"
     LOG_LEVEL: str = "DEBUG"
+    LOG_FORMAT: str = "%(asctime)s - %(levelname)s - %(message)s"
 
 settings = BelphegorSettings(_env_file = ".env", _env_file_encoding = "utf-8")
