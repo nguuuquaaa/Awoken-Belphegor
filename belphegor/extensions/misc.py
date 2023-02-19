@@ -1,7 +1,7 @@
 import discord
-from discord import app_commands as ac, ui
-from discord.enums import ButtonStyle, TextStyle
+from discord import app_commands as ac
 from discord.ext import commands
+import typing
 import asyncio
 import numpy as np
 import time
@@ -10,9 +10,8 @@ from concurrent.futures import ProcessPoolExecutor
 
 from belphegor import utils
 from belphegor.bot import Belphegor
-from belphegor.ext_types import Interaction
-from belphegor.templates.buttons import InputButton
-from belphegor.templates.views import StandardView, ContinuousInputView
+from belphegor.templates import ui_ex, paginators
+from belphegor.templates.discord_types import Interaction
 from .misc_core import calculator
 
 #=============================================================================================================================#
@@ -26,15 +25,61 @@ BOX_PATTERN = {
 
 #=============================================================================================================================#
 
-class MathView(ContinuousInputView):
-    class InputButton(ContinuousInputView.InputButton):
-        class InputModal(ContinuousInputView.InputButton.InputModal):
-            input = ui.TextInput(
-                label = "Input formulas",
-                style = TextStyle.long,
-                min_length = 1,
-                max_length = 1000
-            )
+class Calculator(paginators.ContinuousInput):
+    parser: calculator.MathParse
+
+    class ContinuousInputButton(paginators.ContinuousInput.ContinuousInputButton):
+        class InputModal(paginators.ContinuousInput.ContinuousInputButton.InputModal):
+            class InputTextBox(paginators.ContinuousInput.ContinuousInputButton.InputModal.InputTextBox):
+                label: str = "Input formulas"
+                style: discord.TextStyle = discord.TextStyle.long
+                min_length: int = 1
+                max_length: int = 1000
+
+            async def on_submit(self, interaction: Interaction):
+                panel = self.view.panel
+                inp = self.input_text_box.value
+                parser = self.view.paginator.parser
+
+                await panel.thinking(interaction)
+                try:
+                    start = time.perf_counter()
+                    r = await asyncio.get_running_loop().run_in_executor(None, parser.result, inp)
+                    end = time.perf_counter()
+                    time_taken = end - start
+                except calculator.ParseError as e:
+                    target = getattr(e, "target", parser)
+                    title = "Error"
+                    msg = f"{e}\n```\n{target.show_parse_error()}\n```"
+                except ZeroDivisionError:
+                    title = "Error"
+                    msg = "Division by zero."
+                except OverflowError:
+                    title = "Error"
+                    msg = "IO number too big. U sure need this one?"
+                except ValueError as e:
+                    title = "Error"
+                    target = getattr(e, "target", parser)
+                    msg = f"Calculation error.\n```\n{target.show_parse_error()}\n```"
+                except Exception as e:
+                    title = "Error"
+                    target = getattr(e, "target", parser)
+                    msg = f"Parsing error.\n```\n{target.show_parse_error()}\n```"
+                else:
+                    title = f"Result in {1000*(time_taken):.2f}ms"
+                    r = "\n".join(r)
+                    msg = f"```\n{r}\n```"
+
+                e = discord.Embed(title = title)
+                e.add_field(name = "Input", value = f"```\n{inp}\n```", inline = False)
+                e.add_field(name = "Result", value = msg, inline = False)
+
+                panel.embed = e
+                await panel.reply(interaction)
+
+    def __init__(self):
+        super().__init__()
+        self.parser = calculator.MathParse()
 
 #=============================================================================================================================#
 
@@ -82,51 +127,34 @@ class Misc(commands.Cog):
 
         await interaction.response.send_message(f"```\n{out}\n```")
 
-    @ac.command(name = "calc")
+    @ac.command(name = "calc", description = "A calculator with input rule be quite close to handwritten math formulas.")
     async def calc(
         self,
         interaction: Interaction
     ):
-        m = calculator.MathParse()
+        '''
+            Formulas are separated by linebreak. You can codeblock the whole thing for easier on the eyes.
 
-        view = MathView(allowed_user = interaction.user)
-        async for interaction, input in view.setup(interaction):
-            response = utils.ResponseHelper(interaction)
-            await response.thinking()
-            inp = input.value
-            try:
-                start = time.perf_counter()
-                r = await asyncio.get_running_loop().run_in_executor(None, m.result, inp)
-                end = time.perf_counter()
-                time_taken = end - start
-            except calculator.ParseError as e:
-                target = getattr(e, "target", m)
-                title = "Error"
-                msg = f"{e}\n```\n{target.show_parse_error()}\n```"
-            except ZeroDivisionError:
-                title = "Error"
-                msg = "Division by zero."
-            except OverflowError:
-                title = "Error"
-                msg = "IO number too big. U sure need this one?"
-            except ValueError as e:
-                title = "Error"
-                target = getattr(e, "target", m)
-                msg = f"Calculation error.\n```\n{target.show_parse_error()}\n```"
-            except Exception as e:
-                title = "Error"
-                target = getattr(e, "target", m)
-                msg = f"Parsing error.\n```\n{target.show_parse_error()}\n```"
-            else:
-                title = f"Result in {1000*(time_taken):.2f}ms"
-                r = "\n".join(r)
-                msg = f"```\n{r}\n```"
+            **Acceptable expressions:**
+             - Operators `+` , `-` , `*` , `/` (true div), `//` (div mod), `%` (mod), `^`|`**` (pow), `!` (factorial)
+             - Functions `sin`, `cos`, `tan`, `cot`, `arcsin`|`asin`, `arccos`|`acos`, `arctan`|`atan`, `log` (base 10), `ln` (natural log), `sqrt` (square root), `cbrt` (cube root), `root` (nth root), `abs` (absolute value), `nCk` (combination), `sign`|`sgn` (sign function), `gcd`|`gcf` (greatest common divisor/factor), `lcm` (least common multiple), `max`, `min`, `gamma`, `floor`, `ceil`, `round`
+             - Constants `e`, `pi`|`π`, `tau`|`τ`, `i` (imaginary), `inf`|`∞` (infinity, use at your own risk)
+             - Enclosed `()`, `[]`, `{}`, `\u2308 \u2309` (ceil), `\u230a \u230b` (floor)
+             - Binary/octal/hexadecimal mode. Put `bin:`, `oct:`, `hex:` at the start to use that mode in current line. Default to decimal (`dec:`) mode (well of course)
+             - Set a variable to a value (value can be a calculable formula) for next calculations
+             - Define a function. User functions must be in `func_name(arg1, arg2...)` format, both at defining and using
+             - Special function `sigma`|`Σ` (sum)
+                Format: `sigma(n, from, to)(formula)`
+                Due to how parser works, n must be a wildcard defined by `n = counter` prior to the sigma function.
+             - Special function `reduce` (cumulate)
+                Format: `reduce(function, n, from, to)(formula)`
+                It's like sigma, but use `function` instead of sum.
+                `function` can be either builtin or user-defined, but must take exactly 2 arguments.
+             - Line that starts with `#` is comment
+        '''
 
-            e = discord.Embed(title = title)
-            e.add_field(name = "Input", value = f"```\n{inp}\n```", inline = False)
-            e.add_field(name = "Result", value = msg, inline = False)
-
-            await response.send(embed = e, view = view)
+        calc = Calculator()
+        await calc.initialize(interaction)
 
 #=============================================================================================================================#
 

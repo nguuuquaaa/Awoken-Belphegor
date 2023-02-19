@@ -1,5 +1,5 @@
 import discord
-from discord import app_commands as ac, ui, enums
+from discord import app_commands as ac
 from discord.ext import commands
 import importlib
 import sys
@@ -14,17 +14,15 @@ import enum
 
 from belphegor import utils
 from belphegor.bot import Belphegor
-from belphegor.ext_types import Interaction, File
 from belphegor.errors import FlowControl
-from belphegor.templates.buttons import BaseButton, EmojiType
-from belphegor.templates.views import ContinuousInputView, StandardView
-from belphegor.templates.checks import Check
+from belphegor.templates import ui_ex, checks, panels, paginators
+from belphegor.templates.discord_types import Interaction, File
 
 #=============================================================================================================================#
 
 log = utils.get_logger()
 all_extensions = [fn[:-3] for fn in os.listdir("./belphegor/extensions") if fn.endswith(".py")]
-log.debug(f"all extensions: {', '.join(all_extensions)}")
+log.debug(f"All extensions: {', '.join(all_extensions)}")
 ExtensionChoice = enum.Enum("ExtensionChoice", all_extensions)
 
 #=============================================================================================================================#
@@ -36,121 +34,101 @@ class Admin(commands.Cog):
     @ac.command(name = "reload")
     @ac.describe(extension = "Extension to reload")
     @ac.guilds(306527473997316097, 376585779536723970, 738232588279218338)
-    @ac.check(Check.owner_only())
+    @ac.check(checks.owner_only())
     async def reload(
         self,
         interaction: Interaction,
         extension: ExtensionChoice
     ):
+        panel = panels.Panel()
+        await panel.thinking(interaction)
         extension = extension.name
+        fullname_extension = f"belphegor.extensions.{extension}"
+        try:
+            if fullname_extension in interaction.client.extensions:
+                await interaction.client.reload_extension(fullname_extension)
+            else:
+                await interaction.client.load_extension(fullname_extension)
+        except commands.ExtensionError:
+            panel.content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```"
+        else:
+            log.info(f"Reloaded {fullname_extension}")
+            panel.content = f"```\nSuccess reloading {extension}```"
 
-        class ReloadButton(BaseButton[StandardView]):
-            label: str = f"Reload {extension}"
-            emoji: EmojiType = "\U0001f504"
-            style: enums.ButtonStyle = enums.ButtonStyle.primary
-
-            async def callback(self, interaction: Interaction):
-                fullname_extension = f"belphegor.extensions.{extension}"
-                response = utils.ResponseHelper(interaction)
-                try:
-                    if fullname_extension in interaction.client.extensions:
-                        await interaction.client.reload_extension(fullname_extension)
-                    else:
-                        await interaction.client.load_extension(fullname_extension)
-                except commands.ExtensionError:
-                    await response.send(content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```", view = self.view)
-                else:
-                    log.info(f"Reloaded {fullname_extension}")
-                    await response.send(content = f"```\nSuccess reloading {extension}```", view = self.view)
-
-        view = StandardView()
-        reload_button = ReloadButton()
-        view.add_item(reload_button)
-        view.add_exit_button()
-        await reload_button.callback(interaction)
+        await panel.reply(interaction)
 
     @ac.command(name = "reimport")
     @ac.describe(module = "Module to reimport")
     @ac.guilds(306527473997316097, 376585779536723970, 738232588279218338)
-    @ac.check(Check.owner_only())
+    @ac.check(checks.owner_only())
     async def reimport(
         self,
         interaction: Interaction,
         module: str
     ):
+        panel = panels.Panel()
+        await panel.thinking(interaction)
         try:
             m = importlib.import_module(f"belphegor.{module}")
             importlib.reload(m)
         except :
             traceback.print_exc()
-            await interaction.response.send_message(f"```\nFailed reimporting: {module}```")
+            panel.content = f"```\nFailed reimporting: {module}```"
         else:
             print(f"Reimported belphegor.{module}")
-            await interaction.response.send_message(f"```\nSuccess reimporting: {module}```")
+            panel.content = f"```\nSuccess reimporting: {module}```"
 
-    @ac.command(name = "eval")
-    @ac.guilds(306527473997316097, 376585779536723970, 738232588279218338)
-    @ac.check(Check.owner_only())
-    async def _eval(
-        self,
-        interaction: Interaction
-    ):
-        view = ContinuousInputView(allowed_user = interaction.user)
-        async for interaction, input in view.setup(interaction):
-            response = utils.ResponseHelper(interaction)
-            await response.thinking()
+        await panel.reply(interaction)
 
+    @commands.command(name = "eval")
+    @commands.is_owner()
+    async def eval_(self, ctx, *, raw: str):
+        base_code = utils.clean_codeblock(raw)
+        code = f"async def func():\n{textwrap.indent(base_code, '    ')}"
+        env = {
+            "bot": self.bot,
+            "ctx": ctx,
+            "discord": discord,
+            "commands": commands,
+            "utils": utils,
+            "asyncio": asyncio
+        }
+
+        try:
             try:
-                code = f"async def func():\n{textwrap.indent(input.value, '    ')}"
-                env = {
-                    "bot": self.bot,
-                    "interaction": interaction,
-                    "response": response,
-                    "discord": discord,
-                    "utils": utils,
-                    "asyncio": asyncio
-                }
+                exec(code, env)
+            except Exception as e:
+                raise FlowControl(str(e))
 
-                try:
-                    exec(code, env)
-                except Exception as e:
-                    raise FlowControl({"input": input.value, "output": str(e)})
+            stdout = StringIO()
+            func = env["func"]
+            try:
+                with redirect_stdout(stdout):
+                    await func()
+            except:
+                add_text = f"\n{traceback.format_exc()}"
+            else:
+                add_text = ""
+            finally:
+                raise FlowControl((stdout.getvalue() + add_text).strip())
 
-                stdout = StringIO()
-                func = env["func"]
-                try:
-                    with redirect_stdout(stdout):
-                        await func()
-                except:
-                    add_text = f"\n{traceback.format_exc()}"
-                else:
-                    add_text = ""
-                finally:
-                    raise FlowControl({"input": input.value, "output": (stdout.getvalue() + add_text).strip()})
-
-            except FlowControl as e:
-                iv = e.message["input"]
-                ov = e.message["output"]
-                if len(iv) > 1000 or len(ov) > 1000:
-                    await response.send(
-                        files = [
-                            File.from_str(iv, "input.py"),
-                            File.from_str(ov, "output.txt")
-                        ],
-                        view = view
-                    )
-                else:
-                    embed = discord.Embed()
-                    embed.add_field(name = "Input", value = f"```py\n{iv}\n```", inline = False)
-                    embed.add_field(name = "Output", value = f"```\n{ov}\n```", inline = False)
-                    await response.send(
-                        embed = embed,
-                        view = view
-                    )
+        except FlowControl as e:
+            iv = base_code
+            ov = e.message
+            if len(iv) > 1000 or len(ov) > 1000:
+                await ctx.send(files = [
+                    File.from_str(iv, "input.py"),
+                    File.from_str(ov, "output.txt")
+                ])
+            else:
+                embed = discord.Embed()
+                embed.add_field(name = "Input", value = f"```py\n{iv}\n```", inline = False)
+                embed.add_field(name = "Output", value = f"```\n{ov}\n```", inline = False)
+                await ctx.send(embed = embed)
 
     @commands.command(name = "sync")
     @commands.is_owner()
-    async def old_sync(
+    async def sync(
         self,
         ctx: commands.Context,
         scope: typing.Literal["guild", "global"] = "global",

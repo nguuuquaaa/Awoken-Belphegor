@@ -3,8 +3,8 @@ from discord import app_commands as ac
 from discord.ext import commands
 
 from belphegor.bot import Belphegor
-from belphegor.ext_types import Interaction
-from belphegor.templates.checks import Check
+from belphegor.templates import checks
+from belphegor.templates.discord_types import Interaction
 
 #=============================================================================================================================#
 
