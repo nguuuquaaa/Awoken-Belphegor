@@ -1,13 +1,10 @@
 import discord
-from discord import ui
 import io
-from typing import Awaitable, TypeVar, TYPE_CHECKING
-from typing_extensions import Self
-from collections.abc import Callable
+import typing
 
 #=============================================================================================================================#
 
-if TYPE_CHECKING:
+if typing.TYPE_CHECKING:
     from belphegor.bot import Belphegor
 
 #=============================================================================================================================#

@@ -4,8 +4,10 @@ import typing
 from functools import cached_property
 import abc
 
-from belphegor.ext_types import Interaction
 from . import views, items, text_inputs, modals
+
+if typing.TYPE_CHECKING:
+    from ..discord_types import Interaction
 
 #=============================================================================================================================#
 
@@ -45,8 +47,11 @@ class InputButton(Button[_V]):
         async def on_submit(self, interaction: Interaction):
             pass
 
+    def create_modal(self):
+        return self.InputModal(timeout = self.view.timeout)
+
     async def callback(self, interaction: Interaction):
-        modal = self.InputModal(timeout = self.view.timeout)
+        modal = self.create_modal()
         await interaction.response.send_modal(modal)
 
 class HomeButton(Button[_V]):

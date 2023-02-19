@@ -3,19 +3,18 @@ from discord import ui
 import typing
 from typing_extensions import Self
 
-from belphegor import utils
-from belphegor.ext_types import Interaction
-from .buttons import InputButton as ExitButton
+from . import buttons
 from .metas import PostInitable
 
 if typing.TYPE_CHECKING:
-    from ..panel import Panel
+    from ..discord_types import Interaction
+    from ..panels import Panel
 
 #=============================================================================================================================#
 
 class StandardView(PostInitable, ui.View):
-    allowed_user: discord.User
     panel: "Panel"
+    allowed_user: discord.User
 
     def __init__(self, *, timeout: int | float = 180.0, allowed_user: discord.User = None):
         super().__init__(timeout = timeout)
@@ -23,7 +22,7 @@ class StandardView(PostInitable, ui.View):
         self.target_messages = set()
 
     def add_exit_button(self, row: int = 0) -> Self:
-        self.add_item(ExitButton(row = row))
+        self.add_item(buttons.ExitButton(row = row))
         return self
 
     async def interaction_check(self, interaction: Interaction) -> bool:
