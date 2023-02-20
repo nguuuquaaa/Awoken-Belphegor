@@ -1,17 +1,17 @@
 __all__ = [
     "copy_signature",
-    "__dataclass_transform__"
+    "__dataclass_transform__",
+    "get_default_attribute"
 ]
 
-from typing import TypeVar, ParamSpec, overload, Concatenate
+import typing
 from collections.abc import Callable
-import functools
 
 #=============================================================================================================================#
 
-_T = TypeVar("_T")
-_R = TypeVar("_R")
-_P = ParamSpec("_P")
+_T = typing.TypeVar("_T")
+_R = typing.TypeVar("_R")
+_P = typing.ParamSpec("_P")
 
 def copy_signature(func: Callable[_P, _R]) -> Callable[[Callable], Callable[_P, _R]]:
     def wrapper(f: Callable):
@@ -26,3 +26,7 @@ def __dataclass_transform__(
     field_specifiers: tuple[type | Callable, ...] = (())
 ) -> Callable[[_T], _T]:
     return lambda a: a
+
+def get_default_attribute(obj: typing.Any, key: str, *args, **kwargs):
+    hints = typing.get_type_hints(obj)
+    return hints[key](*args, **kwargs)
