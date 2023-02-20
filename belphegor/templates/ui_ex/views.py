@@ -1,7 +1,6 @@
 import discord
 from discord import ui
 import typing
-from typing_extensions import Self
 
 from .metas import PostInitable
 from ..discord_types import Interaction
@@ -20,10 +19,9 @@ class StandardView(PostInitable, ui.View):
         self.allowed_user = allowed_user
         self.target_messages = set()
 
-    def add_exit_button(self, row: int = 0) -> Self:
+    def add_exit_button(self, row: int = 0):
         from . import buttons
         self.add_item(buttons.ExitButton(row = row))
-        return self
 
     async def interaction_check(self, interaction: Interaction) -> bool:
         if self.allowed_user is None:

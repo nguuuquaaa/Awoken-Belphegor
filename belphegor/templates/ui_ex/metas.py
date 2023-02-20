@@ -81,9 +81,12 @@ class MetaMergeClasstypePropertyItem(MetaItem, MetaMergeClasstypeProperty):
 class PostInitable:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        post_init = getattr(self, "__post_init__", None)
-        if post_init:
-            post_init()
+        try:
+            self.__post_init__
+        except AttributeError:
+            pass
+        else:
+            self.__post_init__()
 
 class BaseItem(PostInitable, metaclass = MetaItem):
     def __init__(self, **kwargs):

@@ -1,6 +1,5 @@
 import discord
 import typing
-from typing_extensions import Self
 from collections.abc import Callable
 import asyncio
 from pydantic.generics import GenericModel
@@ -17,8 +16,29 @@ log = utils.get_logger()
 
 #=============================================================================================================================#
 
+_V = typing.TypeVar("_V", bound = ui_ex.StandardView)
 _VT = typing.TypeVar("_VT")
 _PageItem_VT = typing.ForwardRef("PageItem[_VT]")
+
+class PageItem(GenericModel, typing.Generic[_VT]):
+    value: _VT
+    children: list[_PageItem_VT] = []
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    def __getitem__(self, key: int | tuple[int]) -> _PageItem_VT:
+        if isinstance(key, int):
+            return self.children[key]
+        else:
+            if len(key) == 0:
+                return self
+            else:
+                return self.children[key[0]][key[1:]]
+
+PageItem.update_forward_refs()
+
+#=============================================================================================================================#
 
 class EmbedTemplate(GenericModel, typing.Generic[_VT]):
     title: str | None = None
@@ -107,48 +127,102 @@ EmbedTemplate.update_forward_refs()
 
 #=============================================================================================================================#
 
-class PageItem(GenericModel, typing.Generic[_VT]):
-    value: _VT
-    children: list[_PageItem_VT] = []
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    def __getitem__(self, key: int | tuple[int]) -> _PageItem_VT:
-        if isinstance(key, int):
-            return self.children[key]
-        else:
-            if len(key) == 0:
-                return self
-            else:
-                return self.children[key[0]][key[1:]]
-
-PageItem.update_forward_refs()
-
-#=============================================================================================================================#
+_P = typing.TypeVar("_P", bound = "BasePaginator")
 
 class BasePaginator:
     panel: Panel
 
-    class PaginatorView(ui_ex.StandardView):
-        paginator: "BasePaginator"
-
     def __init__(self):
         self.panel = Panel()
-
-    async def update(self, interaction: Interaction):
-        await self.panel.reply(interaction)
 
     @abc.abstractmethod
     def render(self) -> Panel:
         return self.panel
 
+    async def update(self, interaction: Interaction):
+        panel = self.render()
+        await panel.reply(interaction)
+
     async def initialize(self, interaction: Interaction):
-        self.render()
-        self.panel.view.allowed_user = interaction.user
-        await self.update(interaction)
+        panel = self.render()
+        panel.view.allowed_user = interaction.user
+        await panel.reply(interaction)
+
+    def get_paginator_attribute(self, key: str, *args, **kwargs):
+        value = utils.get_default_attribute(self, key, *args, **kwargs)
+        hints = typing.get_type_hints(type(value))
+        if "paginator" in hints:
+            value.paginator = self
+        return value
 
 #=============================================================================================================================#
+
+class PaginatorNextButton(ui_ex.NextButton[_V]):
+    paginator: "SingleRowPaginator"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+        paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + 1)
+        await paginator.update(interaction)
+
+class PaginatorPreviousButton(ui_ex.PreviousButton[_V]):
+    paginator: "SingleRowPaginator"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+        paginator.current_index = max(0, paginator.current_index - 1)
+        await paginator.update(interaction)
+
+class PaginatorJumpForwardButton(ui_ex.JumpForwardButton[_V]):
+    paginator: "SingleRowPaginator"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+        paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + self.jump)
+        await paginator.update(interaction)
+
+class PaginatorJumpBackwardButton(ui_ex.JumpBackwardButton[_V]):
+    paginator: "SingleRowPaginator"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+        paginator.current_index = max(0, paginator.current_index - self.jump)
+        await paginator.update(interaction)
+
+class PaginatorJumpToModal(ui_ex.JumpToModal):
+    paginator: "SingleRowPaginator"
+
+    async def on_submit(self, interaction: Interaction):
+        paginator = self.paginator
+        try:
+            target_index = self.input_text_box.int_value - 1
+        except ValueError:
+            await paginator.panel.defer()
+        else:
+            paginator.current_index = min(max(0, target_index), paginator.page_amount - 1)
+            await paginator.update(interaction)
+
+class PaginatorJumpToButton(ui_ex.JumpToButton[_V]):
+    paginator: "SingleRowPaginator"
+    input_modal: PaginatorJumpToModal
+
+    def create_modal(self) -> PaginatorJumpToModal:
+        modal = super().create_modal()
+        modal.paginator = self.paginator
+        return modal
+
+class PaginatorSelect(ui_ex.SelectOne[_V]):
+    paginator: "SingleRowPaginator"
+
+    def add_items_as_options(self, items: list[PageItem[_VT]], current_index: int):
+        for i, item in enumerate(items):
+            self.add_option(
+                label = f"{i + current_index + 1}. {item.value}",
+                value = item.value
+            )
+
+class PaginatorEmbed(EmbedTemplate[_VT]):
+    pass
 
 class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
     items: list[PageItem[_VT]]
@@ -158,70 +232,13 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
     current_index: int
     selectable: bool
 
-    class PaginatorView(BasePaginator.PaginatorView):
-        paginator: "SingleRowPaginator"
-
-    class PaginatorNextButton(ui_ex.NextButton[PaginatorView]):
-        async def callback(self, interaction: Interaction):
-            paginator = self.view.paginator
-            paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + 1)
-            paginator.render()
-            await paginator.update(interaction)
-
-    class PaginatorPreviousButton(ui_ex.PreviousButton[PaginatorView]):
-        async def callback(self, interaction: Interaction):
-            paginator = self.view.paginator
-            paginator.current_index = max(0, paginator.current_index - 1)
-            paginator.render()
-            await paginator.update(interaction)
-
-    class PaginatorJumpForwardButton(ui_ex.JumpForwardButton[PaginatorView]):
-        async def callback(self, interaction: Interaction):
-            paginator = self.view.paginator
-            paginator.current_index = min(paginator.page_amount - 1, paginator.current_index + self.jump)
-            paginator.render()
-            await paginator.update(interaction)
-
-    class PaginatorJumpBackwardButton(ui_ex.JumpBackwardButton[PaginatorView]):
-        async def callback(self, interaction: Interaction):
-            paginator = self.view.paginator
-            paginator.current_index = max(0, paginator.current_index - self.jump)
-            paginator.render()
-            await paginator.update(interaction)
-
-    class PaginatorJumpToButton(ui_ex.JumpToButton[PaginatorView]):
-        class InputModal(ui_ex.JumpToButton.InputModal):
-            view: "SingleRowPaginator.PaginatorView"
-
-            async def on_submit(self, interaction: Interaction):
-                paginator = self.view.paginator
-                try:
-                    target_index = self.input_text_box.int_value - 1
-                except ValueError:
-                    await paginator.panel.defer()
-                else:
-                    paginator.current_index = min(max(0, target_index), paginator.page_amount - 1)
-                    paginator.render()
-                    await paginator.update(interaction)
-
-    class PaginatorSelect(ui_ex.Select[PaginatorView]):
-        placeholder: str = "Select"
-        min_values: int = 1
-        max_values: int = 1
-
-        @abc.abstractmethod
-        async def callback(self, interaction: Interaction):
-            return self.values[0]
-
-        def add_items_as_options(self, items: list[PageItem[_VT]], current_index: int):
-            for i, item in enumerate(items):
-                self.add_option(
-                    label = f"{i + current_index + 1}. {item.value}",
-                    value = item.value
-                )
-
-    class PaginatorTemplate(EmbedTemplate[_VT]):
-        pass
+    next_button: PaginatorNextButton
+    previous_button: PaginatorPreviousButton
+    jump_forward_button: PaginatorJumpForwardButton
+    jump_backward_button: PaginatorJumpBackwardButton
+    jump_to_button: PaginatorJumpToButton
+    select_menu: PaginatorSelect
+    embed_template: PaginatorEmbed
 
     def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]] | list[_VT], *, page_size = 20, selectable = False):
         super().__init__()
@@ -237,39 +254,35 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
         self.queue = asyncio.Queue()
         self.selectable = selectable
 
-    _jump_to_button: PaginatorJumpToButton
-    _select: PaginatorSelect
-
     def render(self) -> Panel:
         current_items = self.pages[self.current_index]
         current_first_index = self.page_size * self.current_index
 
-        template = self.PaginatorTemplate()
+        template: EmbedTemplate[_VT] = utils.get_default_attribute(self, "embed_template")
         if template.description is None and template.fields is None:
             template.description = lambda item, index: f"{index + 1}. {item.value}"
         embed = template(current_items, current_first_index)
         self.panel.embed = embed
 
         if self.panel.view:
-            self._jump_to_button.label = f"Page {self.current_index + 1} of {self.page_amount}"
+            self.jump_to_button.label = f"Page {self.current_index + 1} of {self.page_amount}"
             if self.selectable:
-                self._select.options = []
-                self._select.add_items_as_options(current_items, current_first_index)
+                self.select_menu.options = []
+                self.select_menu.add_items_as_options(current_items, current_first_index)
         else:
-            view = self.PaginatorView()
-            view.paginator = self
+            view = ui_ex.StandardView()
 
-            view.add_item(self.PaginatorJumpBackwardButton(row = 1))
-            view.add_item(self.PaginatorPreviousButton(row = 1))
-            self._jump_to_button = self.PaginatorJumpToButton(label = f"Page {self.current_index + 1} of {self.page_amount}", row = 1)
-            view.add_item(self._jump_to_button)
-            view.add_item(self.PaginatorNextButton(row = 1))
-            view.add_item(self.PaginatorJumpForwardButton(row = 1))
+            view.add_item(self.get_paginator_attribute("jump_backward_button", row = 1))
+            view.add_item(self.get_paginator_attribute("previous_button", row = 1))
+            self.jump_to_button = self.get_paginator_attribute("jump_to_button", label = f"Page {self.current_index + 1} of {self.page_amount}", row = 1)
+            view.add_item(self.jump_to_button)
+            view.add_item(self.get_paginator_attribute("next_button", row = 1))
+            view.add_item(self.get_paginator_attribute("jump_forward_button", row = 1))
 
             if self.selectable:
-                self._select = self.PaginatorSelect(row = 0)
-                self._select.add_items_as_options(current_items, current_first_index)
-                view.add_item(self._select)
+                self.select_menu = self.get_paginator_attribute("select_menu", row = 0)
+                self.select_menu.add_items_as_options(current_items, current_first_index)
+                view.add_item(self.select_menu)
 
             view.add_exit_button(row = 2)
 
@@ -279,25 +292,21 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
 
 #=============================================================================================================================#
 
+class ContinuousInputButton(ui_ex.InputButton):
+    paginator: "ContinuousInput"
+
 class ContinuousInput(BasePaginator):
-    class PaginatorView(BasePaginator.PaginatorView):
-        paginator: "ContinuousInput"
-
-    class ContinuousInputButton(ui_ex.InputButton[PaginatorView]):
-        pass
-
-    _continuous_input_button: ContinuousInputButton
+    continuous_input_button: ContinuousInputButton
 
     def render(self):
         if not self.panel.view:
-            view = self.PaginatorView()
-            view.paginator = self
-            self._continuous_input_button = self.ContinuousInputButton()
-            view.add_item(self._continuous_input_button)
+            view = ui_ex.StandardView()
+            self.continuous_input_button = self.get_paginator_attribute("continuous_input_button")
+            view.add_item(self.continuous_input_button)
             view.add_exit_button()
             self.panel.view = view
 
     async def initialize(self, interaction: Interaction):
         self.render()
         self.panel.view.allowed_user = interaction.user
-        await self._continuous_input_button.callback(interaction)
+        await self.continuous_input_button.callback(interaction)

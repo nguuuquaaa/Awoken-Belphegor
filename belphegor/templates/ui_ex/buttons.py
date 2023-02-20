@@ -1,15 +1,15 @@
 import discord
 from discord import ui
 import typing
-from functools import cached_property
 import abc
 
-from . import views, items, text_inputs, modals
+from belphegor import utils
+from . import views, items, modals
 from ..discord_types import Interaction
 
 #=============================================================================================================================#
 
-_V = typing.TypeVar("_V", bound = views.StandardView, covariant = True)
+_V = typing.TypeVar("_V", bound = views.StandardView)
 
 EmojiType: typing.TypeAlias = str | discord.Emoji | discord.PartialEmoji
 
@@ -24,31 +24,19 @@ class Button(items.Item[_V], ui.Button[_V]):
     row: int = None
     disabled: bool = False
 
+    @abc.abstractmethod
+    async def callback(self, interaction: Interaction):
+        pass
+
 class InputButton(Button[_V]):
     label: str = "Input"
     emoji: EmojiType = "\U0001f4dd"
     style: discord.ButtonStyle = discord.ButtonStyle.primary
 
-    class InputModal(modals.Modal):
-        title: str = "Input"
-        view: _V
-        input_text_box: "InputTextBox"
+    input_modal: modals.InputModal
 
-        class InputTextBox(text_inputs.TextInput):
-            label: str = "Input"
-            style: discord.TextStyle = discord.TextStyle.long
-
-        def __post_init__(self):
-            self.input_text_box = self.InputTextBox()
-            self.add_item(self.input_text_box)
-
-        @abc.abstractmethod
-        async def on_submit(self, interaction: Interaction):
-            pass
-
-    def create_modal(self):
-        modal = self.InputModal(timeout = self.view.timeout)
-        modal.view = self.view
+    def create_modal(self) -> modals.InputModal:
+        modal = utils.get_default_attribute(self, "input_modal")
         return modal
 
     async def callback(self, interaction: Interaction):
@@ -112,21 +100,10 @@ class JumpToButton(InputButton[_V]):
     emoji: EmojiType = "\u23fa"
     style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
-    class InputModal(InputButton.InputModal):
-        label: str = "Jump"
-        input_text_box: "InputTextBox"
+    input_modal: modals.JumpToModal
 
-        class InputTextBox(InputButton.InputModal.InputTextBox):
-            label: str = "Jump to page"
-            style: discord.TextStyle = discord.TextStyle.short
-
-            @cached_property
-            def int_value(self):
-                return int(self.value)
-
-        @abc.abstractmethod
-        async def on_submit(self, interaction: Interaction):
-            return self.input_text_box.int_value
+    def create_modal(self) -> modals.JumpToModal:
+        return super().create_modal()
 
 #=============================================================================================================================#
 
