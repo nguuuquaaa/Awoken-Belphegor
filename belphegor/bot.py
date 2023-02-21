@@ -55,8 +55,6 @@ class Belphegor(commands.Bot):
             await self.load_extension(f"belphegor.extensions.{extension}")
             log.info(f"Done loading {extension}")
 
-        await self.tree.sync()
-
     async def on_ready(self):
         self.owner_id = self.application.owner.id
         log.info("Logged in as")
