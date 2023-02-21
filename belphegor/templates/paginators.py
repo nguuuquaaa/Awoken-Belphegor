@@ -127,8 +127,6 @@ EmbedTemplate.update_forward_refs()
 
 #=============================================================================================================================#
 
-_P = typing.TypeVar("_P", bound = "BasePaginator")
-
 class BasePaginator:
     panel: Panel
 
@@ -204,6 +202,7 @@ class PaginatorJumpToModal(ui_ex.JumpToModal):
 
 class PaginatorJumpToButton(ui_ex.JumpToButton[_V]):
     paginator: "SingleRowPaginator"
+
     input_modal: PaginatorJumpToModal
 
     def create_modal(self) -> PaginatorJumpToModal:
@@ -298,13 +297,14 @@ class ContinuousInputButton(ui_ex.InputButton):
 class ContinuousInput(BasePaginator):
     continuous_input_button: ContinuousInputButton
 
-    def render(self):
+    def render(self) -> Panel:
         if not self.panel.view:
             view = ui_ex.StandardView()
             self.continuous_input_button = self.get_paginator_attribute("continuous_input_button")
             view.add_item(self.continuous_input_button)
             view.add_exit_button()
             self.panel.view = view
+        return self.panel
 
     async def initialize(self, interaction: Interaction):
         self.render()

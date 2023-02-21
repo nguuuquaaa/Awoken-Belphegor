@@ -7,7 +7,7 @@ import asyncio
 from belphegor import utils
 from belphegor.settings import settings
 from belphegor.bot import Belphegor
-from belphegor.templates.discord_types import Interaction
+from belphegor.templates.discord_types import Interaction, File
 
 #=============================================================================================================================#
 
@@ -39,20 +39,24 @@ class ErrorHandler(commands.Cog):
         self.bot.on_error = self.old_on_error
         self.bot.tree.on_error = self.old_app_command_error
 
+    async def send_error_hook(self, msg: str):
+        now = utils.now()
+        await self.error_hook.send(file = File.from_str(msg, now.strftime("%Y-%m-%d %H-%M-%S") + ".log"))
+
     async def on_error(self, event, *args, **kwargs):
         etype, e, etb = sys.exc_info()
         if not isinstance(e, discord.Forbidden):
             prt_err = "".join(traceback.format_exception(e))
-            msg = f"```\nIgnoring exception in event {event}:\n{prt_err}\n```"
+            msg = f"Event {event} raised an error:\n{prt_err}"
             log.error(msg)
-            await self.error_hook.execute(msg)
+            await self.send_error_hook(msg)
 
     async def on_app_command_error(self, interaction: Interaction, error: Exception):
         if not isinstance(error, discord.Forbidden):
             prt_err = "\n".join(traceback.format_exception(error))
-            msg = f"```\nIgnoring exception in interaction {interaction.type.name}:\n{prt_err}\n```"
+            msg = f"Interaction {interaction.type.name} raised an error:\n{prt_err}"
             log.error(msg)
-            await self.error_hook.execute(msg)
+            await self.send_error_hook(msg)
 
 #=============================================================================================================================#
 

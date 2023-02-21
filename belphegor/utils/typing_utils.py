@@ -5,7 +5,6 @@ __all__ = [
 ]
 
 import typing
-from typing_extensions import Self
 from collections.abc import Callable
 
 #=============================================================================================================================#
@@ -28,6 +27,7 @@ def __dataclass_transform__(
 ) -> Callable[[_T], _T]:
     return lambda a: a
 
-def get_default_attribute(obj: typing.Any, key: str, *args, **kwargs):
-    hints = typing.get_type_hints(type(obj))
+def get_default_attribute(obj, key: str, *args, **kwargs):
+    from typing_extensions import Self
+    hints = typing.get_type_hints(type(obj), localns = locals())
     return hints[key](*args, **kwargs)
