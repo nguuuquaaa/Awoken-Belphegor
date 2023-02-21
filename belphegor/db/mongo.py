@@ -4,14 +4,14 @@ from pydantic import BaseModel
 from pymongo.errors import BulkWriteError
 from collections.abc import Callable
 import inspect
-from typing import Any
+import typing
 
 from belphegor import utils
 
 #=============================================================================================================================#
 
 class MongoQueue:
-    def __init__(self, collection: "MongoCollectionEX", size: int = 1000, *, ordered: bool = True, callback: Callable[[Exception | None], Any] | None = None):
+    def __init__(self, collection: "MongoCollectionEX", size: int = 1000, *, ordered: bool = True, callback: Callable[[Exception | None], typing.Any] | None = None):
         self._collection = collection
         self._size = size
         self._ordered = ordered
@@ -63,24 +63,24 @@ class MongoQueue:
 
 #=============================================================================================================================#
 
-AsyncIOMotorCollection: type[AgnosticCollection] = AsyncIOMotorCollection
-class MongoCollectionEX(AsyncIOMotorCollection):
-    def batch_write(self, batch_size: int = 1000, *, ordered: bool = True, callback: Callable[[Exception | None], Any] | None = None) -> MongoQueue:
+MotorCollectionBase = typing.cast(type[AgnosticCollection], AsyncIOMotorCollection)
+class MongoCollectionEX(MotorCollectionBase):
+    def batch_write(self, batch_size: int = 1000, *, ordered: bool = True, callback: Callable[[Exception | None], typing.Any] | None = None) -> MongoQueue:
         """
         Improve database writing performance by automatically spliting write requests into batches.
         """
         return MongoQueue(self, size = batch_size, ordered = ordered, callback = callback)
 
-AsyncIOMotorDatabase: type[AgnosticDatabase] = AsyncIOMotorDatabase
-class MongoDatabaseEX(AsyncIOMotorDatabase):
+MotorDatabaseBase = typing.cast(type[AgnosticDatabase], AsyncIOMotorDatabase)
+class MongoDatabaseEX(MotorDatabaseBase):
     def __getattr__(self, name) -> MongoCollectionEX:
         return super().__getattr__(name)
 
     def __getitem__(self, name) -> MongoCollectionEX:
         return MongoCollectionEX(self, name)
 
-AsyncIOMotorClient: type[AgnosticClient] = AsyncIOMotorClient
-class MongoClientEX(AsyncIOMotorClient):
+MotorClientBase = typing.cast(type[AgnosticClient], AsyncIOMotorClient)
+class MongoClientEX(MotorClientBase):
     def __getattr__(self, name) -> MongoDatabaseEX:
         return super().__getattr__(name)
 
