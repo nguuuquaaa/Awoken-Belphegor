@@ -1,10 +1,9 @@
 from collections.abc import Iterable
 import re
 
-class QueryTemplate:
-    @staticmethod
-    def match_any(name: str, fields: Iterable[str]) -> list[dict]:
-        return [
+def match_any(name: str, fields: Iterable[str]) -> dict[str, list[dict]]:
+    return {
+        "$or": [
             {
                 field: {
                     "$regex": ".*?".join(map(re.escape, name.split())),
@@ -12,3 +11,4 @@ class QueryTemplate:
                 }
             } for field in fields
         ]
+    }

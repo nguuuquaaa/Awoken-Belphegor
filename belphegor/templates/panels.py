@@ -135,3 +135,8 @@ class Panel:
             pass
         else:
             await interaction.response.defer(ephemeral = self.ephemeral)
+
+    def stop(self):
+        "Stop listening."
+        if self.view:
+            self.view.stop()

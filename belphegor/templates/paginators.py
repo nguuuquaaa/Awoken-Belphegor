@@ -221,7 +221,7 @@ class PaginatorSelect(ui_ex.SelectOne[_V]):
             )
 
 class PaginatorEmbed(EmbedTemplate[_VT]):
-    pass
+    colour: discord.Colour = discord.Colour.blue()
 
 class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
     items: list[PageItem[_VT]]
@@ -239,7 +239,7 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
     select_menu: PaginatorSelect
     embed_template: PaginatorEmbed
 
-    def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]] | list[_VT], *, page_size = 20, selectable = False):
+    def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]] | list[_VT], *, page_size: int = 20, selectable: bool = False):
         super().__init__()
         if isinstance(items, PageItem):
             self.items = items.children
@@ -253,15 +253,21 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
         self.queue = asyncio.Queue()
         self.selectable = selectable
 
-    def render(self) -> Panel:
+    def create_embed(self) -> discord.Embed:
         current_items = self.pages[self.current_index]
         current_first_index = self.page_size * self.current_index
 
-        template: EmbedTemplate[_VT] = utils.get_default_attribute(self, "embed_template")
+        template: EmbedTemplate[_VT] = self.get_paginator_attribute("embed_template")
         if template.description is None and template.fields is None:
             template.description = lambda item, index: f"{index + 1}. {item.value}"
         embed = template(current_items, current_first_index)
         self.panel.embed = embed
+
+        return embed
+
+    def create_view(self) -> ui_ex.StandardView:
+        current_items = self.pages[self.current_index]
+        current_first_index = self.page_size * self.current_index
 
         if self.panel.view:
             self.jump_to_button.label = f"Page {self.current_index + 1} of {self.page_amount}"
@@ -287,6 +293,11 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
 
             self.panel.view = view
 
+        return self.panel.view
+
+    def render(self) -> Panel:
+        self.create_embed()
+        self.create_view()
         return self.panel
 
 #=============================================================================================================================#
