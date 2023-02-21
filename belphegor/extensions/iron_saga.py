@@ -1,8 +1,8 @@
 import discord
-from discord import app_commands as ac, ui
+from discord import app_commands as ac
 from discord.ext import commands
 from pydantic import BaseModel, Field
-from typing import Literal, TypeAlias, Optional
+import typing
 from collections.abc import Callable
 from urllib.parse import quote
 import json
@@ -13,12 +13,8 @@ import traceback
 from belphegor import errors, utils
 from belphegor.utils import CircleIter, grouper, wiki
 from belphegor.bot import Belphegor
-from belphegor.ext_types import Interaction, File
-from belphegor.templates.views import StandardView
-from belphegor.templates.buttons import BaseButton, StatsButton, TriviaButton, SkinsButton
-from belphegor.templates.selects import BaseSelect
-from belphegor.templates.paginators import SingleRowPaginator, PageItem
-from belphegor.templates.checks import Check
+from belphegor.templates import ui_ex, paginators, queries, checks
+from belphegor.templates.discord_types import Interaction, File
 
 #=============================================================================================================================#
 
@@ -69,7 +65,22 @@ def handle_reference(box, *args, **kwargs):
 
 #=============================================================================================================================#
 
-PilotPersonality: TypeAlias = Literal["Brave", "Calm", "Energetic", "Extreme", "Friendly", "Gentle", "Impatient", "Lazy", "Mighty", "Normal", "Peaceful", "Rational", "Sensitive", "Timid"]
+PilotPersonality: typing.TypeAlias = typing.Literal[
+    "Brave",
+    "Calm",
+    "Energetic",
+    "Extreme",
+    "Friendly",
+    "Gentle",
+    "Impatient",
+    "Lazy",
+    "Mighty",
+    "Normal",
+    "Peaceful",
+    "Rational",
+    "Sensitive",
+    "Timid"
+]
 
 class PilotStats(BaseModel):
     melee: int = Field(..., gt = 0)
@@ -117,7 +128,7 @@ class Pilot(BaseModel):
     description: str | None
     skins: list[PilotSkin]
 
-    def display_stats_info(self, view: "PilotView") -> discord.Embed:
+    def display_stats_info(self, paging: "PilotPaginator"):
         embed = discord.Embed(
             title = self.en_name or self.page_name,
             color = discord.Color.red(),
@@ -148,13 +159,14 @@ class Pilot(BaseModel):
                 inline=False
             )
 
-        skin = view.skins.current().current()
-        view.skin_select.placeholder = skin.name
+        skin = paging.skins.current().current()
+        paging.skin_select.placeholder = skin.name
         embed.set_image(url = skin.url)
 
-        return embed
+        paging.panel.embed = embed
+        return paging.panel
 
-    def display_other_info(self, view: "PilotView") -> discord.Embed:
+    def display_other_info(self, paging: "PilotPaginator"):
         embed = discord.Embed(
             title = self.en_name or self.page_name,
             description = self.description or "N/A",
@@ -165,69 +177,106 @@ class Pilot(BaseModel):
         embed.add_field(name = "Artist", value = self.artist or "N/A")
         embed.add_field(name = "Voice actor", value = self.voice_actor or "N/A")
 
-        skin = view.skins.current().current()
-        view.skin_select.placeholder = skin.name
+        skin = paging.skins.current().current()
+        paging.skin_select.placeholder = skin.name
         embed.set_image(url = skin.url)
 
+        paging.panel.embed = embed
+        return paging.panel
+
+class PilotReductSkills(Pilot):
+    skills: tuple[PilotSkill, ...]
+
+#=============================================================================================================================#
+
+class PilotSelectMenu(paginators.PaginatorSelect):
+    paginator: "PilotSelector"
+
+    async def callback(self, interaction: Interaction):
+        pilot = self.paginator.pilots[self.values[0]]
+        pilot_paging = PilotPaginator(pilot)
+        await pilot_paging.initialize(interaction)
+
+class PilotSelector(paginators.SingleRowPaginator):
+    pilots: dict[str, Pilot]
+
+    select_menu: PilotSelectMenu
+
+    @classmethod
+    def from_pilots(cls, pilots: list[Pilot]):
+        paging = cls([paginators.PageItem(value = p.en_name) for p in pilots], selectable = True)
+        paging.pilots = {p.en_name: p for p in pilots}
+        return paging
+
+    def create_embed(self):
+        embed = super().create_embed()
+        embed.title = f"Found {len(self.pilots)} pilots"
         return embed
 
 #=============================================================================================================================#
 
-class ISStatsButton(StatsButton["PilotView"]):
+class ISStatsButton(ui_ex.StatsButton):
     emoji = discord.PartialEmoji(name = "exp_capsule", id = 824327490536341504)
 
-    async def callback(self, interaction: Interaction):
-        view = self.view
-        view.embed_display = partial(view.pilot.display_stats_info, view)
-        embed = view.embed_display()
-        await interaction.response.edit_message(embed = embed, view = view)
+    paginator: "PilotPaginator"
 
-class ISTriviaButton(TriviaButton["PilotView"]):
     async def callback(self, interaction: Interaction):
-        view = self.view
-        view.embed_display = partial(view.pilot.display_other_info, view)
-        embed = view.embed_display()
-        await interaction.response.edit_message(embed = embed, view = view)
+        paging = self.paginator
+        paging.render = partial(paging.pilot.display_stats_info, paging)
+        await paging.update(interaction)
 
-class ISSkinsButton(SkinsButton["PilotView"]):
+class ISTriviaButton(ui_ex.TriviaButton):
+    paginator: "PilotPaginator"
+
     async def callback(self, interaction: Interaction):
-        view = self.view
-        view.show_next_skin_set()
-        embed = view.embed_display()
-        await interaction.response.edit_message(embed = embed, view = view)
+        paging = self.paginator
+        paging.render = partial(paging.pilot.display_other_info, paging)
+        await paging.update(interaction)
 
-class ISSkinSelect(BaseSelect["PilotView"]):
+class ISSkinsButton(ui_ex.SkinsButton):
+    paginator: "PilotPaginator"
+
+    async def callback(self, interaction: Interaction):
+        paging = self.paginator
+        paging.show_next_skin_set()
+        await paging.update(interaction)
+
+class ISSkinSelect(ui_ex.SelectOne):
     placeholder = "Select skin to display"
-    min_values = 1
-    max_values = 1
+
+    paginator: "PilotPaginator"
 
     async def callback(self, interaction: Interaction):
-        view = self.view
+        paging = self.paginator
         result = self.values[0]
-        view.skins.current().jump_to(int(result))
-        embed = view.embed_display()
-        await interaction.response.edit_message(embed = embed, view = view)
+        paging.skins.current().jump_to(int(result))
+        await paging.update(interaction)
 
-class PilotView(StandardView):
+class PilotPaginator(paginators.BasePaginator):
     SKIN_SELECT_SIZE = 20
 
     pilot: Pilot
     skins: CircleIter[CircleIter[PilotSkin]]
-    embed_display: Callable[[], discord.Embed]
+
+    stat_button: ISStatsButton
+    trivia_button: ISTriviaButton
+    skin_button: ISSkinsButton
     skin_select: ISSkinSelect
 
-    @classmethod
-    def from_pilot(cls, pilot: Pilot):
-        view = cls()
-        view.pilot = pilot
-        view.skins = CircleIter([CircleIter(s, start_index = 0) for s in grouper(pilot.skins, cls.SKIN_SELECT_SIZE, incomplete = "missing")], start_index = -1)
-        view.embed_display = partial(view.pilot.display_stats_info, view)
-        view.show_next_skin_set()
-        view.add_item(ISStatsButton(row = 1))
-        view.add_item(ISTriviaButton(row = 1))
-        view.add_item(ISSkinsButton(row = 1))
+    def __init__(self, pilot: Pilot):
+        super().__init__()
+        self.pilot = pilot
+        self.skins = CircleIter([CircleIter(s, start_index = 0) for s in grouper(pilot.skins, self.SKIN_SELECT_SIZE, incomplete = "missing")], start_index = -1)
+        self.render = partial(self.pilot.display_stats_info, self)
+
+        view = ui_ex.StandardView()
+        view.add_item(self.get_paginator_attribute("stat_button", row = 1))
+        view.add_item(self.get_paginator_attribute("trivia_button", row = 1))
+        view.add_item(self.get_paginator_attribute("skin_button", row = 1))
         view.add_exit_button(row = 1)
-        return view
+        self.panel.view = view
+
+        self.show_next_skin_set()
 
     def show_next_skin_set(self):
         if getattr(self, "skin_select", None):
@@ -236,14 +285,32 @@ class PilotView(StandardView):
         next(self.skins)
         set_index, batch = self.skins.current(True)
         batch.jump_to(0)
-        skin_select = ISSkinSelect(row = 0)
+        skin_select = self.get_paginator_attribute("skin_select", row = 0)
         for i, skin in enumerate(batch.iter_once()):
             skin_select.add_option(
                 label = f"{set_index * self.SKIN_SELECT_SIZE + i + 1}. {skin.name}",
                 value = str(i)
             )
         self.skin_select = skin_select
-        self.add_item(skin_select)
+        self.panel.view.add_item(skin_select)
+
+#=============================================================================================================================#
+
+class SkillEmbedTemplate(paginators.PaginatorEmbed):
+    fields: Callable = lambda item, index: (
+        item.value.en_name,
+        f"**{item.value.skills[0].name} {'[' + item.value.skills[0].copilot + ']' if item.value.skills[0].copilot else ''}**\n{item.value.skills[0].effect}",
+        False
+    )
+
+class SkillPaginator(PilotSelector):
+    embed_template: SkillEmbedTemplate
+
+    @classmethod
+    def from_pilots(cls, pilots: list[PilotReductSkills]):
+        paging = cls([paginators.PageItem(value = p) for p in pilots], page_size = 5, selectable = False)
+        paging.pilots = {p.en_name: p for p in pilots}
+        return paging
 
 #=============================================================================================================================#
 
@@ -256,8 +323,8 @@ COLOR_MAPPING = {
 
 class Part(BaseModel):
     name: str
-    classification: Literal["core", "shell", "support", "armour", "coating"]
-    rank: Literal["S", "A", "B", "C"]
+    classification: typing.Literal["core", "shell", "support", "armour", "coating"]
+    rank: typing.Literal["S", "A", "B", "C"]
     effect: str
     thumbnail: str
     aliases: list[str] = []
@@ -269,6 +336,35 @@ class Part(BaseModel):
             color = COLOR_MAPPING[self.rank]
         )
         embed.set_thumbnail(url = self.thumbnail)
+        return embed
+
+#=============================================================================================================================#
+
+class PartSelectMenu(paginators.PaginatorSelect):
+    paginator: "PartSelector"
+
+    async def callback(self, interaction: Interaction):
+        part = self.paginator.parts[self.values[0]]
+        panel = self.paginator.panel
+        panel.stop()
+        panel.view = None
+        panel.embed = part.display()
+        await panel.reply(interaction)
+
+class PartSelector(paginators.SingleRowPaginator):
+    parts: dict[str, Part]
+
+    select_menu: PartSelectMenu
+
+    @classmethod
+    def from_parts(cls, parts: list[Part]):
+        paging = cls([paginators.PageItem(value = p.name) for p in parts], selectable = True)
+        paging.parts = {p.name: p for p in parts}
+        return paging
+
+    def create_embed(self):
+        embed = super().create_embed()
+        embed.title = f"Found {len(self.parts)} parts"
         return embed
 
 #=============================================================================================================================#
@@ -290,6 +386,35 @@ class Pet(BaseModel):
 
 #=============================================================================================================================#
 
+class PetSelectMenu(paginators.PaginatorSelect):
+    paginator: "PetSelector"
+
+    async def callback(self, interaction: Interaction):
+        pet = self.paginator.pets[self.values[0]]
+        panel = self.paginator.panel
+        panel.stop()
+        panel.view = None
+        panel.embed = pet.display()
+        await panel.reply(interaction)
+
+class PetSelector(paginators.SingleRowPaginator):
+    pets: dict[str, Pet]
+
+    select_menu: PetSelectMenu
+
+    @classmethod
+    def from_pets(cls, pets: list[Pet]):
+        paging = cls([paginators.PageItem(value = p.name) for p in pets], selectable = True)
+        paging.pets = {p.name: p for p in pets}
+        return paging
+
+    def create_embed(self):
+        embed = super().create_embed()
+        embed.title = f"Found {len(self.pets)} pets"
+        return embed
+
+#=============================================================================================================================#
+
 class IronSaga(commands.Cog):
     def __init__(self, bot: Belphegor):
         self.bot = bot
@@ -297,12 +422,10 @@ class IronSaga(commands.Cog):
     @ac.command(name = "pilot")
     @ac.describe(name = "Pilot name")
     async def get_pilot(self, interaction: Interaction, name: str):
-        pilots: dict[str, Pilot] = {}
+        pilots = []
         async for doc in self.bot.mongo.db.iron_saga_pilots.aggregate([
             {
-                "$match": {
-                    "$or": utils.QueryHelper.broad_search(name, ("en_name", "jp_name", "aliases"))
-                }
+                "$match": queries.match_any(name, ("en_name", "jp_name", "aliases"))
             },
             {
                 "$sort": {
@@ -315,90 +438,62 @@ class IronSaga(commands.Cog):
                 }
             }
         ]):
-            pilots[doc["en_name"]] = Pilot(**doc)
+            pilots.append(Pilot(**doc))
 
         if len(pilots) == 0:
             return await interaction.response.send_message(f"Can't find any pilot with name: {name}")
 
         if len(pilots) > 1:
-            class PilotPaginator(SingleRowPaginator):
-                class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
-                    placeholder = "Select pilot"
-
-                class PaginatorTemplate(SingleRowPaginator.PaginatorTemplate):
-                    title = f"Found {len(pilots)} pilots"
-                    colour = discord.Colour.blue()
-
-            items = [PageItem(value = pn) for pn in pilots]
-            items.sort(key = lambda x: x.value)
-
-            paginator = PilotPaginator(items = items, page_size = 20)
-            async for interaction, value in paginator.setup(interaction, timeout = 180):
-                break
-
-            pilot = pilots[value]
-            del pilots
-            view = PilotView.from_pilot(pilot)
-            view.allowed_user = interaction.user
-            await interaction.response.edit_message(embed = view.embed_display(), view = view)
+            paging = PilotSelector.from_pilots(pilots)
+            await paging.initialize(interaction)
         else:
-            pilot = list(pilots.values())[0]
-            del pilots
-            view = PilotView.from_pilot(pilot)
-            view.allowed_user = interaction.user
-            await interaction.response.send_message(embed = view.embed_display(), view = view)
+            paging = PilotPaginator(pilots[0])
+            await paging.initialize(interaction)
 
     @ac.command(name = "skill")
     @ac.describe(name = "Skill name")
     async def skill(self, interaction: Interaction, name: str):
         pilots = []
-        async for doc in self.bot.mongo.db.iron_saga_pilots.find(
+        async for doc in self.bot.mongo.db.iron_saga_pilots.aggregate([
             {
-                "skills": {
-                    "$elemMatch": {
-                        "$or": utils.QueryHelper.broad_search(name, ["name", "effect"])
+                "$match": {
+                    "skills": {
+                        "$elemMatch": queries.match_any(name, ["name", "effect"])
                     }
                 }
             },
-            projection = {
-                "_id": 0,
-                "en_name": 1,
-                "skills.$": 1
+            {
+                "$sort": {
+                    "en_name": 1
+                }
+            },
+            {
+                "$addFields": {
+                    "_id": "$$REMOVE",
+                    "skills": {
+                        "$filter": {
+                            "input": "$skills",
+                            "cond": queries.aggregate_match_any(name, ["$$this.name", "$$this.effect"])
+                        }
+                    }
+                }
             }
-        ):
-            pilots.append({"name": doc["en_name"], "skill": doc["skills"][0]})
+        ]):
+            pilots.append(PilotReductSkills(**doc))
 
         if pilots:
-            class PilotPaginator(SingleRowPaginator):
-                class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
-                    placeholder = "Select pilot"
-
-                class PaginatorTemplate(SingleRowPaginator.PaginatorTemplate):
-                    title = f"Found {len(pilots)} pilots"
-                    colour = discord.Colour.blue()
-                    fields: Callable = lambda x, i: (
-                        x.value["name"],
-                        f"**{x.value['skill']['name']} {'[' + x.value['skill']['copilot'] + ']' if x.value['skill']['copilot'] else ''}**\n{x.value['skill']['effect']}",
-                        False
-                    )
-
-            items = [PageItem(value = pn) for pn in pilots]
-            paginator = PilotPaginator(items = items, page_size = 5, selectable =  False)
-            async for interaction, value in paginator.setup(interaction, timeout = 180):
-                pass
-
+            paging = SkillPaginator.from_pilots(pilots)
+            await paging.initialize(interaction)
         else:
-            await interaction.response.send_message(f"Cannot find skill with name: {name}")
+            return await interaction.response.send_message(f"Can't find any skill with name: {name}")
 
     @ac.command(name = "part")
     @ac.describe(name = "Part name")
     async def get_part(self, interaction: Interaction, name: str):
-        parts: dict[str, Part] = {}
+        parts = []
         async for doc in self.bot.mongo.db.iron_saga_parts.aggregate([
             {
-                "$match": {
-                    "$or": utils.QueryHelper.broad_search(name, ("name", "aliases"))
-                }
+                "$match": queries.match_any(name, ("name", "aliases"))
             },
             {
                 "$sort": {
@@ -411,45 +506,24 @@ class IronSaga(commands.Cog):
                 }
             }
         ]):
-            parts[doc["name"]] = Part(**doc)
+            parts.append(Part(**doc))
 
         if len(parts) == 0:
             return await interaction.response.send_message(f"Can't find any part with name: {name}")
 
-
         if len(parts) > 1:
-            class PartPaginator(SingleRowPaginator):
-                class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
-                    placeholder = "Select part"
-
-                class PaginatorTemplate(SingleRowPaginator.PaginatorTemplate):
-                    title = f"Found {len(parts)} parts"
-                    colour = discord.Colour.blue()
-
-            items = [PageItem(value = pn) for pn in parts]
-            items.sort(key = lambda x: x.value)
-
-            paginator = PartPaginator(items = items, page_size = 20)
-            async for interaction, value in paginator.setup(interaction, timeout = 180):
-                break
-
-            part = parts[value]
-            del parts
-            await interaction.response.edit_message(embed = part.display(), view = None)
+            paging = PartSelector.from_parts(parts)
+            paging.initialize(interaction)
         else:
-            part = list(parts.values())[0]
-            del parts
-            await interaction.response.send_message(embed = part.display())
+            await interaction.response.send_message(embed = parts[0].display())
 
     @ac.command(name = "pet")
     @ac.describe(name = "Pet name")
     async def get_pet(self, interaction: Interaction, name: str):
-        pets: dict[str, Pet] = {}
+        pets = []
         async for doc in self.bot.mongo.db.iron_saga_pets.aggregate([
             {
-                "$match": {
-                    "$or": utils.QueryHelper.broad_search(name, ("name", "aliases"))
-                }
+                "$match": queries.match_any(name, ("name", "aliases"))
             },
             {
                 "$sort": {
@@ -462,40 +536,22 @@ class IronSaga(commands.Cog):
                 }
             }
         ]):
-            pets[doc["name"]] = Pet(**doc)
+            pets.append(Pet(**doc))
 
         if len(pets) == 0:
-            return await interaction.response.send_message(f"Can't find any part with name: {name}")
+            return await interaction.response.send_message(f"Can't find any pet with name: {name}")
 
         if len(pets) > 1:
-            class PetPaginator(SingleRowPaginator):
-                class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
-                    placeholder = "Select pet"
-
-                class PaginatorTemplate(SingleRowPaginator.PaginatorTemplate):
-                    title = f"Found {len(pets)} parts"
-                    colour = discord.Colour.blue()
-
-            items = [PageItem(value = pn) for pn in pets]
-            items.sort(key = lambda x: x.value)
-
-            paginator = PetPaginator(items = items, page_size = 20)
-            async for interaction, value in paginator.setup(interaction, timeout = 180):
-                break
-
-            pet = pets[value]
-            del pets
-            await interaction.response.edit_message(embed = pet.display(), view = None)
+            paging = PetSelector.from_parts(pets)
+            paging.initialize(interaction)
         else:
-            pet = list(pets.values())[0]
-            del pets
-            await interaction.response.send_message(embed = pet.display())
+            await interaction.response.send_message(embed = pets[0].display())
 
     update = ac.Group(name = "update", description = "Update database")
 
     @update.command(name = "pilot")
-    @ac.check(Check.owner_only())
-    async def update_pilot(self, interaction: Interaction, name: Optional[str] = None):
+    @ac.check(checks.owner_only())
+    async def update_pilot(self, interaction: Interaction, name: typing.Optional[str] = None):
         await interaction.response.defer(thinking = True)
         if name is None:
             params = {
@@ -674,7 +730,7 @@ class IronSaga(commands.Cog):
         return pilot
 
     @update.command(name = "part")
-    @ac.check(Check.owner_only())
+    @ac.check(checks.owner_only())
     async def update_part(self, interaction: Interaction, message_id: str):
         try:
             message_id = int(message_id)
@@ -692,7 +748,7 @@ class IronSaga(commands.Cog):
         await interaction.response.send_message("Done.")
 
     @update.command(name = "pet")
-    @ac.check(Check.owner_only())
+    @ac.check(checks.owner_only())
     async def update_pet(self, interaction: Interaction, message_id: str):
         try:
             message_id = int(message_id)
