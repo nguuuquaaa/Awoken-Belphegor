@@ -25,61 +25,83 @@ BOX_PATTERN = {
 
 #=============================================================================================================================#
 
+class MathTextBox(ui_ex.InputTextBox):
+    label: str = "Input formulas"
+    min_length: int = 1
+    max_length: int = 1000
+
+class MathInputModal(ui_ex.InputModal):
+    paginator: "Calculator"
+
+    input_text_box: MathTextBox
+
+    async def on_submit(self, interaction: Interaction):
+        panel = self.paginator.panel
+        inp = self.input_text_box.value
+        parser = self.paginator.parser
+
+        await panel.thinking(interaction)
+        try:
+            start = time.perf_counter()
+            r = await asyncio.get_running_loop().run_in_executor(None, parser.result, inp)
+            end = time.perf_counter()
+            time_taken = end - start
+        except calculator.ParseError as e:
+            target = getattr(e, "target", parser)
+            title = "Error"
+            msg = f"{e}\n```\n{target.show_parse_error()}\n```"
+        except ZeroDivisionError:
+            title = "Error"
+            msg = "Division by zero."
+        except OverflowError:
+            title = "Error"
+            msg = "IO number too big. U sure need this one?"
+        except ValueError as e:
+            title = "Error"
+            target = getattr(e, "target", parser)
+            msg = f"Calculation error.\n```\n{target.show_parse_error()}\n```"
+        except Exception as e:
+            title = "Error"
+            target = getattr(e, "target", parser)
+            msg = f"Parsing error.\n```\n{target.show_parse_error()}\n```"
+        else:
+            title = f"Result in {1000*(time_taken):.2f}ms"
+            r = "\n".join(r)
+            msg = f"```\n{r}\n```"
+
+        e = discord.Embed(title = title)
+        e.add_field(name = "Input", value = f"```\n{inp}\n```", inline = False)
+        e.add_field(name = "Result", value = msg, inline = False)
+
+        panel.embed = e
+        await panel.reply(interaction)
+
+class MathContinuousInputButton(paginators.ContinuousInputButton):
+    paginator: "Calculator"
+
+    input_modal: MathInputModal
+
+    def create_modal(self) -> MathInputModal:
+        modal = super().create_modal()
+        modal.paginator = self.paginator
+        return modal
+
 class Calculator(paginators.ContinuousInput):
     parser: calculator.MathParse
 
-    class ContinuousInputButton(paginators.ContinuousInput.ContinuousInputButton):
-        class InputModal(paginators.ContinuousInput.ContinuousInputButton.InputModal):
-            class InputTextBox(paginators.ContinuousInput.ContinuousInputButton.InputModal.InputTextBox):
-                label: str = "Input formulas"
-                style: discord.TextStyle = discord.TextStyle.long
-                min_length: int = 1
-                max_length: int = 1000
-
-            async def on_submit(self, interaction: Interaction):
-                panel = self.view.panel
-                inp = self.input_text_box.value
-                parser = self.view.paginator.parser
-
-                await panel.thinking(interaction)
-                try:
-                    start = time.perf_counter()
-                    r = await asyncio.get_running_loop().run_in_executor(None, parser.result, inp)
-                    end = time.perf_counter()
-                    time_taken = end - start
-                except calculator.ParseError as e:
-                    target = getattr(e, "target", parser)
-                    title = "Error"
-                    msg = f"{e}\n```\n{target.show_parse_error()}\n```"
-                except ZeroDivisionError:
-                    title = "Error"
-                    msg = "Division by zero."
-                except OverflowError:
-                    title = "Error"
-                    msg = "IO number too big. U sure need this one?"
-                except ValueError as e:
-                    title = "Error"
-                    target = getattr(e, "target", parser)
-                    msg = f"Calculation error.\n```\n{target.show_parse_error()}\n```"
-                except Exception as e:
-                    title = "Error"
-                    target = getattr(e, "target", parser)
-                    msg = f"Parsing error.\n```\n{target.show_parse_error()}\n```"
-                else:
-                    title = f"Result in {1000*(time_taken):.2f}ms"
-                    r = "\n".join(r)
-                    msg = f"```\n{r}\n```"
-
-                e = discord.Embed(title = title)
-                e.add_field(name = "Input", value = f"```\n{inp}\n```", inline = False)
-                e.add_field(name = "Result", value = msg, inline = False)
-
-                panel.embed = e
-                await panel.reply(interaction)
+    continuous_input_button: MathContinuousInputButton
 
     def __init__(self):
         super().__init__()
         self.parser = calculator.MathParse()
+
+    def render(self):
+        if not self.panel.view:
+            view = ui_ex.StandardView()
+            self.continuous_input_button = self.get_paginator_attribute("continuous_input_button")
+            view.add_item(self.continuous_input_button)
+            view.add_exit_button()
+            self.panel.view = view
 
 #=============================================================================================================================#
 
