@@ -330,7 +330,7 @@ class ContinuousSummon(paginators.BasePaginator):
 #=============================================================================================================================#
 
 class Otogi(commands.Cog):
-    def __init__(self, bot: Belphegor):
+    def __init__(self, bot: "Belphegor"):
         self.bot = bot
         self.db = bot.mongo.db
 

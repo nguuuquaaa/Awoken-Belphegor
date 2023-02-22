@@ -429,7 +429,7 @@ class PetSelector(paginators.SingleRowPaginator):
 #=============================================================================================================================#
 
 class IronSaga(commands.Cog):
-    def __init__(self, bot: Belphegor):
+    def __init__(self, bot: "Belphegor"):
         self.bot = bot
 
     @ac.command(name = "pilot")
