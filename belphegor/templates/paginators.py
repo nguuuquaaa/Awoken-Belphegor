@@ -220,7 +220,7 @@ class PaginatorSelect(ui_ex.SelectOne[_V]):
                 value = item.value
             )
 
-class PaginatorEmbed(EmbedTemplate[_VT]):
+class PaginatorEmbedTemplate(EmbedTemplate[_VT]):
     colour: discord.Colour = discord.Colour.blue()
     description: Callable[[PageItem[_VT], int], str] = lambda item, index: f"{index + 1}. {item.value}"
 
@@ -238,7 +238,7 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
     jump_backward_button: PaginatorJumpBackwardButton
     jump_to_button: PaginatorJumpToButton
     select_menu: PaginatorSelect
-    embed_template: PaginatorEmbed
+    embed_template: PaginatorEmbedTemplate
 
     def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]] | list[_VT], *, page_size: int = 20, selectable: bool = False):
         super().__init__()

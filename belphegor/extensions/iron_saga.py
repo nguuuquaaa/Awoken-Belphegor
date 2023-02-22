@@ -296,7 +296,7 @@ class PilotDisplay(paginators.BasePaginator):
 
 #=============================================================================================================================#
 
-class SkillEmbedTemplate(paginators.PaginatorEmbed):
+class SkillEmbedTemplate(paginators.PaginatorEmbedTemplate):
     fields: Callable = lambda item, index: (
         item.value.en_name,
         f"**{item.value.skills[0].name} {'[' + item.value.skills[0].copilot + ']' if item.value.skills[0].copilot else ''}**\n{item.value.skills[0].effect}",
@@ -358,7 +358,7 @@ class PartSelectMenu(paginators.PaginatorSelect):
         panel.embed = part.display()
         await panel.reply(interaction)
 
-class PartEmbedTemplate(paginators.PaginatorEmbed):
+class PartEmbedTemplate(paginators.PaginatorEmbedTemplate):
     description: Callable[[paginators.PageItem, int], str] = lambda item, index: f"{index + 1}. [{item.value.rank}] {item.value.name}"
 
 class PartSelector(paginators.SingleRowPaginator):
