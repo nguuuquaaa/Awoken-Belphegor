@@ -8,9 +8,11 @@ import random
 
 from belphegor import utils
 from belphegor.utils import wiki
-from belphegor.bot import Belphegor
 from belphegor.templates import ui_ex, paginators, queries
 from belphegor.templates.discord_types import Interaction
+
+if typing.TYPE_CHECKING:
+    from belphegor.bot import Belphegor
 
 #=============================================================================================================================#
 

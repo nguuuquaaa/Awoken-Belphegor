@@ -12,9 +12,11 @@ import traceback
 
 from belphegor import errors, utils
 from belphegor.utils import CircleIter, grouper, wiki
-from belphegor.bot import Belphegor
 from belphegor.templates import ui_ex, paginators, queries, checks
 from belphegor.templates.discord_types import Interaction, File
+
+if typing.TYPE_CHECKING:
+    from belphegor.bot import Belphegor
 
 #=============================================================================================================================#
 
