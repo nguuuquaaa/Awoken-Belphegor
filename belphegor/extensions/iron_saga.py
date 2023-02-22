@@ -128,7 +128,7 @@ class Pilot(BaseModel):
     description: str | None
     skins: list[PilotSkin]
 
-    def display_stats_info(self, paging: "PilotPaginator"):
+    def display_stats_info(self, paginator: "PilotDisplay"):
         embed = discord.Embed(
             title = self.en_name or self.page_name,
             color = discord.Color.red(),
@@ -159,14 +159,14 @@ class Pilot(BaseModel):
                 inline=False
             )
 
-        skin = paging.skins.current().current()
-        paging.skin_select.placeholder = skin.name
+        skin = paginator.skins.current().current()
+        paginator.skin_select.placeholder = skin.name
         embed.set_image(url = skin.url)
 
-        paging.panel.embed = embed
-        return paging.panel
+        paginator.panel.embed = embed
+        return paginator.panel
 
-    def display_other_info(self, paging: "PilotPaginator"):
+    def display_other_info(self, paginator: "PilotDisplay"):
         embed = discord.Embed(
             title = self.en_name or self.page_name,
             description = self.description or "N/A",
@@ -177,12 +177,12 @@ class Pilot(BaseModel):
         embed.add_field(name = "Artist", value = self.artist or "N/A")
         embed.add_field(name = "Voice actor", value = self.voice_actor or "N/A")
 
-        skin = paging.skins.current().current()
-        paging.skin_select.placeholder = skin.name
+        skin = paginator.skins.current().current()
+        paginator.skin_select.placeholder = skin.name
         embed.set_image(url = skin.url)
 
-        paging.panel.embed = embed
-        return paging.panel
+        paginator.panel.embed = embed
+        return paginator.panel
 
 class PilotReductSkills(Pilot):
     skills: tuple[PilotSkill, ...]
@@ -194,7 +194,7 @@ class PilotSelectMenu(paginators.PaginatorSelect):
 
     async def callback(self, interaction: Interaction):
         pilot = self.paginator.pilots[self.values[0]]
-        pilot_paging = PilotPaginator(pilot)
+        pilot_paging = PilotDisplay(pilot)
         await pilot_paging.initialize(interaction)
 
 class PilotSelector(paginators.SingleRowPaginator):
@@ -204,9 +204,9 @@ class PilotSelector(paginators.SingleRowPaginator):
 
     @classmethod
     def from_pilots(cls, pilots: list[Pilot]):
-        paging = cls([paginators.PageItem(value = p.en_name) for p in pilots], selectable = True)
-        paging.pilots = {p.en_name: p for p in pilots}
-        return paging
+        paginator = cls([paginators.PageItem(value = p.en_name) for p in pilots], selectable = True)
+        paginator.pilots = {p.en_name: p for p in pilots}
+        return paginator
 
     def create_embed(self):
         embed = super().create_embed()
@@ -218,41 +218,41 @@ class PilotSelector(paginators.SingleRowPaginator):
 class ISStatsButton(ui_ex.StatsButton):
     emoji = discord.PartialEmoji(name = "exp_capsule", id = 824327490536341504)
 
-    paginator: "PilotPaginator"
+    paginator: "PilotDisplay"
 
     async def callback(self, interaction: Interaction):
-        paging = self.paginator
-        paging.render = partial(paging.pilot.display_stats_info, paging)
-        await paging.update(interaction)
+        paginator = self.paginator
+        paginator.render = partial(paginator.pilot.display_stats_info, paginator)
+        await paginator.update(interaction)
 
 class ISTriviaButton(ui_ex.TriviaButton):
-    paginator: "PilotPaginator"
+    paginator: "PilotDisplay"
 
     async def callback(self, interaction: Interaction):
-        paging = self.paginator
-        paging.render = partial(paging.pilot.display_other_info, paging)
-        await paging.update(interaction)
+        paginator = self.paginator
+        paginator.render = partial(paginator.pilot.display_other_info, paginator)
+        await paginator.update(interaction)
 
 class ISSkinsButton(ui_ex.SkinsButton):
-    paginator: "PilotPaginator"
+    paginator: "PilotDisplay"
 
     async def callback(self, interaction: Interaction):
-        paging = self.paginator
-        paging.show_next_skin_set()
-        await paging.update(interaction)
+        paginator = self.paginator
+        paginator.show_next_skin_set()
+        await paginator.update(interaction)
 
 class ISSkinSelect(ui_ex.SelectOne):
     placeholder = "Select skin to display"
 
-    paginator: "PilotPaginator"
+    paginator: "PilotDisplay"
 
     async def callback(self, interaction: Interaction):
-        paging = self.paginator
+        paginator = self.paginator
         result = self.values[0]
-        paging.skins.current().jump_to(int(result))
-        await paging.update(interaction)
+        paginator.skins.current().jump_to(int(result))
+        await paginator.update(interaction)
 
-class PilotPaginator(paginators.BasePaginator):
+class PilotDisplay(paginators.BasePaginator):
     SKIN_SELECT_SIZE = 20
 
     pilot: Pilot
@@ -308,9 +308,9 @@ class SkillPaginator(PilotSelector):
 
     @classmethod
     def from_pilots(cls, pilots: list[PilotReductSkills]):
-        paging = cls([paginators.PageItem(value = p) for p in pilots], page_size = 5, selectable = False)
-        paging.pilots = {p.en_name: p for p in pilots}
-        return paging
+        paginator = cls([paginators.PageItem(value = p) for p in pilots], page_size = 5, selectable = False)
+        paginator.pilots = {p.en_name: p for p in pilots}
+        return paginator
 
 #=============================================================================================================================#
 
@@ -358,9 +358,9 @@ class PartSelector(paginators.SingleRowPaginator):
 
     @classmethod
     def from_parts(cls, parts: list[Part]):
-        paging = cls([paginators.PageItem(value = p.name) for p in parts], selectable = True)
-        paging.parts = {p.name: p for p in parts}
-        return paging
+        paginator = cls([paginators.PageItem(value = p.name) for p in parts], selectable = True)
+        paginator.parts = {p.name: p for p in parts}
+        return paginator
 
     def create_embed(self):
         embed = super().create_embed()
@@ -404,9 +404,9 @@ class PetSelector(paginators.SingleRowPaginator):
 
     @classmethod
     def from_pets(cls, pets: list[Pet]):
-        paging = cls([paginators.PageItem(value = p.name) for p in pets], selectable = True)
-        paging.pets = {p.name: p for p in pets}
-        return paging
+        paginator = cls([paginators.PageItem(value = p.name) for p in pets], selectable = True)
+        paginator.pets = {p.name: p for p in pets}
+        return paginator
 
     def create_embed(self):
         embed = super().create_embed()
@@ -444,11 +444,11 @@ class IronSaga(commands.Cog):
             return await interaction.response.send_message(f"Can't find any pilot with name: {name}")
 
         if len(pilots) > 1:
-            paging = PilotSelector.from_pilots(pilots)
-            await paging.initialize(interaction)
+            paginator = PilotSelector.from_pilots(pilots)
+            await paginator.initialize(interaction)
         else:
-            paging = PilotPaginator(pilots[0])
-            await paging.initialize(interaction)
+            paginator = PilotDisplay(pilots[0])
+            await paginator.initialize(interaction)
 
     @ac.command(name = "skill")
     @ac.describe(name = "Skill name")
@@ -482,8 +482,8 @@ class IronSaga(commands.Cog):
             pilots.append(PilotReductSkills(**doc))
 
         if pilots:
-            paging = SkillPaginator.from_pilots(pilots)
-            await paging.initialize(interaction)
+            paginator = SkillPaginator.from_pilots(pilots)
+            await paginator.initialize(interaction)
         else:
             return await interaction.response.send_message(f"Can't find any skill with name: {name}")
 
@@ -512,8 +512,8 @@ class IronSaga(commands.Cog):
             return await interaction.response.send_message(f"Can't find any part with name: {name}")
 
         if len(parts) > 1:
-            paging = PartSelector.from_parts(parts)
-            paging.initialize(interaction)
+            paginator = PartSelector.from_parts(parts)
+            paginator.initialize(interaction)
         else:
             await interaction.response.send_message(embed = parts[0].display())
 
@@ -542,8 +542,8 @@ class IronSaga(commands.Cog):
             return await interaction.response.send_message(f"Can't find any pet with name: {name}")
 
         if len(pets) > 1:
-            paging = PetSelector.from_parts(pets)
-            paging.initialize(interaction)
+            paginator = PetSelector.from_parts(pets)
+            paginator.initialize(interaction)
         else:
             await interaction.response.send_message(embed = pets[0].display())
 
