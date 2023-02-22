@@ -2,19 +2,19 @@ import discord
 from discord import app_commands as ac
 from discord.ext import commands
 from pydantic import BaseModel
-from typing import Literal, Callable
+import typing
 import functools
 import random
 
 from belphegor import utils
 from belphegor.utils import wiki
 from belphegor.bot import Belphegor
-from belphegor.ext_types import Interaction
-from belphegor.templates.paginators import SingleRowPaginator, PageItem
-from belphegor.templates.views import StandardView
-from belphegor.templates.buttons import BaseButton, StatsButton, TriviaButton, SkinsButton
+from belphegor.templates import ui_ex, paginators, queries
+from belphegor.templates.discord_types import Interaction
 
 #=============================================================================================================================#
+
+OTOGI_WIKIA_URL = "https://otogi.wikia.com"
 
 SPECIAL = {
     "Commander Yashichi": ("Yashichi", "prefixed"),
@@ -70,8 +70,8 @@ class Daemon(BaseModel):
     mlb_atk: int
     mlb_hp: int
     rarity: int
-    daemon_type: Literal["phantasma", "divina", "anima"]
-    daemon_class: Literal["melee", "ranged", "healer", "assist"]
+    daemon_type: typing.Literal["phantasma", "divina", "anima"]
+    daemon_class: typing.Literal["melee", "ranged", "healer", "assist"]
     skills: list[DaemonEffect]
     abilities: list[DaemonEffect]
     bonds: list[DaemonEffect]
@@ -83,7 +83,7 @@ class Daemon(BaseModel):
     notes_and_trivia: str | None
     quotes: DaemonAllQuotes
 
-    def display_stats(self, view: "DaemonView"):
+    def display_stats(self, paginator: "DaemonDisplay"):
         data_embed = discord.Embed(
             title = f"{EMOJIS[self.daemon_type]} {self.name}",
             description =
@@ -113,10 +113,11 @@ class Daemon(BaseModel):
                         inline = False
                     )
 
-        data_embed.set_image(url = view.images.current())
-        return data_embed
+        data_embed.set_image(url = paginator.images.current())
+        paginator.panel.embed = data_embed
+        return paginator.panel
 
-    def display_trivia(self, view: "DaemonView"):
+    def display_trivia(self, paginator: "DaemonDisplay"):
         description = self.description or "--"
         des = description.partition(".")
         data_embed = discord.Embed(
@@ -140,64 +141,189 @@ class Daemon(BaseModel):
             inline = False
         )
 
-        data_embed.set_image(url = view.images.current())
-        return data_embed
+        data_embed.set_image(url = paginator.images.current())
+        paginator.panel.embed = data_embed
+        return paginator.panel
 
 #=============================================================================================================================#
 
-class OtogiStatsButton(StatsButton["DaemonView"]):
-    emoji = discord.PartialEmoji(name = "mochi", id = 337860563860324354)
+class DaemonSelectMenu(paginators.PaginatorSelect):
+    paginator: "DaemonSelector"
 
     async def callback(self, interaction: Interaction):
-        view = self.view
-        view.embed_display = functools.partial(view.daemon.display_stats, view)
-        embed = view.embed_display()
-        await interaction.response.edit_message(embed = embed, view = view)
+        daemon = self.paginator.daemons[self.values[0]]
+        paginator = DaemonDisplay(daemon)
+        await paginator.initialize(interaction)
 
-class OtogiTriviaButton(TriviaButton["DaemonView"]):
-    async def callback(self, interaction: Interaction):
-        view = self.view
-        view.embed_display = functools.partial(view.daemon.display_trivia, view)
-        embed = view.embed_display()
-        await interaction.response.edit_message(embed = embed, view = view)
+class DaemonSelector(paginators.SingleRowPaginator):
+    daemons: dict[str, Daemon]
 
-class OtogiImageButton(SkinsButton["DaemonView"]):
-    label = "Image"
-
-    async def callback(self, interaction: Interaction):
-        view = self.view
-        next(view.images)
-        embed = view.embed_display()
-        await interaction.response.edit_message(embed = embed, view = view)
-
-class DaemonView(StandardView):
-    daemon: Daemon
-    images: utils.CircleIter[str]
-    embed_display: Callable[[], discord.Embed]
+    select_menu: DaemonSelectMenu
 
     @classmethod
-    def from_daemon(cls, daemon: Daemon):
-        view = cls()
-        view.daemon = daemon
-        view.images = utils.CircleIter([p for p in [daemon.pic_url, daemon.artwork_url] if p], start_index = 0)
-        view.embed_display = functools.partial(daemon.display_stats, view)
-        view.add_item(OtogiStatsButton())
-        view.add_item(OtogiTriviaButton())
-        view.add_item(OtogiImageButton())
-        view.add_exit_button()
-        return view
+    def from_daemons(cls, daemons: list[Daemon]):
+        paginator = cls([paginators.PageItem(value = d.name) for d in daemons], selectable = True)
+        paginator.daemons = {d.name: d for d in daemons}
+        return paginator
+
+    def create_embed(self):
+        embed = super().create_embed()
+        embed.title = f"Found {len(self.daemons)} daemons"
+        return embed
 
 #=============================================================================================================================#
 
-class OtogiSummonButton(BaseButton):
+class DaemonStatsButton(ui_ex.StatsButton):
+    emoji = discord.PartialEmoji(name = "mochi", id = 337860563860324354)
+
+    paginator: "DaemonDisplay"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+        paginator.render = functools.partial(paginator.daemon.display_stats, paginator)
+        await paginator.update(interaction)
+
+class DaemonTriviaButton(ui_ex.TriviaButton):
+    paginator: "DaemonDisplay"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+        paginator.render = functools.partial(paginator.daemon.display_trivia, paginator)
+        await paginator.update(interaction)
+
+class DaemonImageButton(ui_ex.SkinsButton):
+    label = "Image"
+
+    paginator: "DaemonDisplay"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+        next(paginator.images)
+        await paginator.update(interaction)
+
+class DaemonDisplay(paginators.BasePaginator):
+    daemon: Daemon
+    images: utils.CircleIter[str]
+
+    stats_button: DaemonStatsButton
+    trivia_button: DaemonTriviaButton
+    image_button: DaemonImageButton
+
+    def __init__(self, daemon: Daemon):
+        super().__init__()
+        self.daemon = daemon
+        self.images = utils.CircleIter([p for p in [daemon.pic_url, daemon.artwork_url] if p], start_index = 0)
+        self.render = functools.partial(daemon.display_stats, self)
+
+        view = ui_ex.StandardView()
+        view.add_item(self.get_paginator_attribute("stats_button"))
+        view.add_item(self.get_paginator_attribute("trivia_button"))
+        view.add_item(self.get_paginator_attribute("image_button"))
+        view.add_exit_button()
+        self.panel.view = view
+
+#=============================================================================================================================#
+
+class SummonButton(ui_ex.Button):
     label = "Summon"
     emoji = EMOJIS["invoker"]
     style = discord.enums.ButtonStyle.primary
 
-class OtogiSummonResultButton(BaseButton):
-    label = "Result"
-    emoji = "\U0001f9c2"
+    paginator: "ContinuousSummon"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+
+        roll = random.randrange(100)
+        if roll < 4:
+            rarity = 5
+        elif 4 <= roll < 22:
+            rarity = 4
+        else:
+            rarity = 3
+        d = random.choice(paginator.pool[rarity])
+        paginator.total_summons += 1
+
+        embed = discord.Embed(
+            title = f"{interaction.user.display_name} summoned {d['name']}!",
+            colour = discord.Colour.orange(),
+            url = OTOGI_WIKIA_URL
+        )
+        embed.set_image(url = d["pic_url"])
+        embed.set_footer(text = f"Total: {paginator.total_summons} summons")
+
+        paginator.panel.embed = embed
+        paginator.panel.embeds = discord.utils.MISSING
+        await paginator.update(interaction)
+
+class Summon10Button(ui_ex.Button):
+    label = "x10 summon"
+    emoji = EMOJIS["invoker"]
     style = discord.enums.ButtonStyle.primary
+
+    paginator: "ContinuousSummon"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+
+        result = []
+        for _ in range(10):
+            roll = random.randrange(100)
+            if roll < 4:
+                rarity = 5
+            elif 4 <= roll < 22:
+                rarity = 4
+            else:
+                rarity = 3
+            result.append(random.choice(paginator.pool[rarity]))
+        paginator.total_summons += 10
+
+        embed = discord.Embed(
+            title = f"{interaction.user.display_name} summoned 10 times!",
+            colour = discord.Colour.orange(),
+            description = "\n".join(d["name"] for d in result),
+            url = OTOGI_WIKIA_URL
+        )
+        embed.set_image(url = result[0]["pic_url"])
+        embed.set_footer(text = f"Total: {paginator.total_summons} summons")
+        embeds = [embed]
+
+        for d in result[1:]:
+            embed = discord.Embed(url = OTOGI_WIKIA_URL)
+            embed.set_image(url = d["pic_url"])
+            embeds.append(embed)
+
+        paginator.panel.embed = discord.utils.MISSING
+        paginator.panel.embeds = embeds
+        await paginator.update(interaction)
+
+class ContinuousSummon(paginators.BasePaginator):
+    pool: dict[int, list[dict[str]]]
+    total_summons: int
+
+    summon_button: SummonButton
+
+    @classmethod
+    def from_pool(cls, pool: dict[int, list[dict[str]]]):
+        paginator = cls()
+        paginator.pool = pool
+        paginator.total_summons = 0
+        return paginator
+
+    def render(self):
+        if not self.panel.view:
+            view = ui_ex.StandardView()
+            self.summon_button = self.get_paginator_attribute("summon_button")
+            view.add_item(self.summon_button)
+            view.add_exit_button()
+            self.panel.view = view
+
+        return self.panel
+
+    async def initialize(self, interaction: Interaction):
+        panel = self.render()
+        panel.view.allowed_user = interaction.user
+        await self.summon_button.callback(interaction)
 
 #=============================================================================================================================#
 
@@ -212,13 +338,11 @@ class Otogi(commands.Cog):
         """
         Display a daemon info.
         """
-        daemons: dict[str, Daemon] = {}
+        daemons = []
 
         async for doc in self.db.otogi_daemons.aggregate([
             {
-                "$match": {
-                    "$or": utils.QueryHelper.broad_search(name, ("name", "aliases"))
-                }
+                "$match": queries.match_any(name, ["name", "aliases"])
             },
             {
                 "$sort": {
@@ -231,69 +355,59 @@ class Otogi(commands.Cog):
                 }
             }
         ]):
-            daemons[doc["name"]] = Daemon(**doc)
+            daemons.append(Daemon(**doc))
 
         if len(daemons) == 0:
             return await interaction.response.send_message(f"Can't find any daemon with name: {name}")
 
         if len(daemons) > 1:
-            class DaemonPaginator(SingleRowPaginator):
-                class PaginatorSelect(SingleRowPaginator.PaginatorSelect):
-                    placeholder = "Select daemon"
-
-                class PaginatorTemplate(SingleRowPaginator.PaginatorTemplate):
-                    title = f"Found {len(daemons)} daemons"
-                    colour = discord.Colour.orange()
-
-            items = [PageItem(value = dn) for dn in daemons]
-            items.sort(key = lambda x: x.value)
-
-            paginator = DaemonPaginator(items = items, page_size = 20)
-            async for interaction, value in paginator.setup(interaction, timeout = 180):
-                break
-
-            daemon = daemons[value]
-            del daemons
-            view = DaemonView.from_daemon(daemon)
-            await interaction.response.edit_message(embed = daemon.display_stats(view), view = view)
+            paginator = DaemonSelector.from_daemons(daemons)
+            await paginator.initialize(interaction)
         else:
-            daemon = list(daemons.values())[0]
-            del daemons
-            view = DaemonView.from_daemon(daemon)
-            await interaction.response.send_message(embed = daemon.display_stats(view), view = view)
+            paginator = DaemonDisplay(daemons[0])
+            await paginator.initialize(interaction)
 
     @ac.command(name = "ls")
     async def lunchsummon(self, interaction: Interaction):
-        pool = {doc["rarity"]: doc["pool"] async for doc in self.db.otogi_summon_pool.find({})}
+        pool = {}
+        async for doc in self.db.otogi_summon_pool.aggregate([
+            {
+                "$unwind": "$pool"
+            },
+            {
+                "$lookup": {
+                    "from": "otogi_daemons",
+                    "localField": "pool",
+                    "foreignField": "index",
+                    "as": "daemon"
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$rarity",
+                    "pool": {
+                        "$push": {
+                            "name": {
+                                "$arrayElemAt": [
+                                    "$daemon.name",
+                                    0
+                                ]
+                            },
+                            "pic_url": {
+                                "$arrayElemAt": [
+                                    "$daemon.pic_url",
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        ]):
+            pool[doc["_id"]] = doc["pool"]
 
-        class SummonOneButton(OtogiSummonButton):
-            async def callback(inner_self, interaction: Interaction):
-                roll = random.randrange(100)
-                if roll < 4:
-                    rarity = 5
-                elif 4 <= roll < 22:
-                    rarity = 4
-                else:
-                    rarity = 3
-                did = random.choice(pool[rarity])
-                daemon = await self.db.otogi_daemons.find_one({"index": did}, {"_id": 0, "name": 1, "pic_url": 1})
-                inner_self.view.total_summons += 1
-
-                embed = discord.Embed(
-                    title = f"{interaction.user.display_name} summoned {daemon['name']}!",
-                    colour = discord.Colour.orange()
-                )
-                embed.set_image(url = daemon["pic_url"])
-                embed.set_footer(text = f"Total: {inner_self.view.total_summons} summons")
-                response = utils.ResponseHelper(interaction)
-                await response.send(embed = embed, view = inner_self.view)
-
-        view = StandardView()
-        view.total_summons = 0
-        summon = SummonOneButton()
-        view.add_item(summon)
-        view.add_exit_button()
-        await summon.callback(interaction)
+        cont_summon = ContinuousSummon.from_pool(pool)
+        await cont_summon.initialize(interaction)
 
 #=============================================================================================================================#
 
