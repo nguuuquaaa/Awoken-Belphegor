@@ -222,6 +222,7 @@ class PaginatorSelect(ui_ex.SelectOne[_V]):
 
 class PaginatorEmbed(EmbedTemplate[_VT]):
     colour: discord.Colour = discord.Colour.blue()
+    description: Callable[[PageItem[_VT], int], str] = lambda item, index: f"{index + 1}. {item.value}"
 
 class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
     items: list[PageItem[_VT]]
@@ -257,9 +258,7 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
         current_items = self.pages[self.current_index]
         current_first_index = self.page_size * self.current_index
 
-        template: EmbedTemplate[_VT] = self.get_paginator_attribute("embed_template")
-        if template.description is None and template.fields is None:
-            template.description = lambda item, index: f"{index + 1}. {item.value}"
+        template = self.get_paginator_attribute("embed_template")
         embed = template(current_items, current_first_index)
         self.panel.embed = embed
 

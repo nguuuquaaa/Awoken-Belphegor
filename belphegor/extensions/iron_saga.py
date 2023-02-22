@@ -194,8 +194,8 @@ class PilotSelectMenu(paginators.PaginatorSelect):
 
     async def callback(self, interaction: Interaction):
         pilot = self.paginator.pilots[self.values[0]]
-        pilot_paging = PilotDisplay(pilot)
-        await pilot_paging.initialize(interaction)
+        paginator = PilotDisplay(pilot)
+        await paginator.initialize(interaction)
 
 class PilotSelector(paginators.SingleRowPaginator):
     pilots: dict[str, Pilot]
@@ -343,6 +343,13 @@ class Part(BaseModel):
 class PartSelectMenu(paginators.PaginatorSelect):
     paginator: "PartSelector"
 
+    def add_items_as_options(self, items: list[paginators.PageItem[Part]], current_index: int):
+        for i, item in enumerate(items):
+            self.add_option(
+                label = f"{i + current_index + 1}. {item.value.name}",
+                value = f"{item.value.rank}_{item.value.name}"
+            )
+
     async def callback(self, interaction: Interaction):
         part = self.paginator.parts[self.values[0]]
         panel = self.paginator.panel
@@ -351,15 +358,19 @@ class PartSelectMenu(paginators.PaginatorSelect):
         panel.embed = part.display()
         await panel.reply(interaction)
 
+class PartEmbedTemplate(paginators.PaginatorEmbed):
+    description: Callable[[paginators.PageItem, int], str] = lambda item, index: f"{index + 1}. [{item.value.rank}] {item.value.name}"
+
 class PartSelector(paginators.SingleRowPaginator):
     parts: dict[str, Part]
 
     select_menu: PartSelectMenu
+    embed_template: PartEmbedTemplate
 
     @classmethod
     def from_parts(cls, parts: list[Part]):
-        paginator = cls([paginators.PageItem(value = p.name) for p in parts], selectable = True)
-        paginator.parts = {p.name: p for p in parts}
+        paginator = cls([paginators.PageItem(value = p) for p in parts], selectable = True)
+        paginator.parts = {f"{p.rank}_{p.name}": p for p in parts}
         return paginator
 
     def create_embed(self):
@@ -496,13 +507,25 @@ class IronSaga(commands.Cog):
                 "$match": queries.match_any(name, ("name", "aliases"))
             },
             {
-                "$sort": {
-                    "en_name": 1
+                "$addFields": {
+                    "_rank_index": {
+                        "$indexOfArray": [
+                            ["S", "A", "B", "C"],
+                            "$rank"
+                        ]
+                    }
                 }
             },
             {
-                "$project": {
-                    "_id": 0
+                "$sort": {
+                    "_rank_index": 1,
+                    "name": 1
+                }
+            },
+            {
+                "$addFields": {
+                    "_id": "$$REMOVE",
+                    "_rank_index": "$$REMOVE"
                 }
             }
         ]):
@@ -513,7 +536,7 @@ class IronSaga(commands.Cog):
 
         if len(parts) > 1:
             paginator = PartSelector.from_parts(parts)
-            paginator.initialize(interaction)
+            await paginator.initialize(interaction)
         else:
             await interaction.response.send_message(embed = parts[0].display())
 
@@ -527,12 +550,12 @@ class IronSaga(commands.Cog):
             },
             {
                 "$sort": {
-                    "en_name": 1
+                    "name": 1
                 }
             },
             {
-                "$project": {
-                    "_id": 0
+                "$addFields": {
+                    "_id": "$$REMOVE"
                 }
             }
         ]):
@@ -542,8 +565,8 @@ class IronSaga(commands.Cog):
             return await interaction.response.send_message(f"Can't find any pet with name: {name}")
 
         if len(pets) > 1:
-            paginator = PetSelector.from_parts(pets)
-            paginator.initialize(interaction)
+            paginator = PetSelector.from_pets(pets)
+            await paginator.initialize(interaction)
         else:
             await interaction.response.send_message(embed = pets[0].display())
 
