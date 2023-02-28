@@ -299,7 +299,7 @@ class PilotDisplay(paginators.BasePaginator):
 #=============================================================================================================================#
 
 class SkillEmbedTemplate(paginators.PaginatorEmbedTemplate):
-    description = None
+    description: str | Callable | None = None
     fields: Callable = lambda item, index: (
         item.value.en_name,
         f"**{item.value.skills[0].name} {'[' + item.value.skills[0].copilot + ']' if item.value.skills[0].copilot else ''}**\n{item.value.skills[0].effect}",
