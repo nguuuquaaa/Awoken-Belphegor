@@ -186,7 +186,7 @@ class Pilot(BaseModel):
         paginator.panel.embed = embed
         return paginator.panel
 
-class PilotReductSkills(Pilot):
+class PilotReducedSkills(Pilot):
     skills: tuple[PilotSkill, ...]
 
 #=============================================================================================================================#
@@ -310,7 +310,7 @@ class SkillPaginator(PilotSelector):
     embed_template: SkillEmbedTemplate
 
     @classmethod
-    def from_pilots(cls, pilots: list[PilotReductSkills]):
+    def from_pilots(cls, pilots: list[PilotReducedSkills]):
         paginator = cls([paginators.PageItem(value = p) for p in pilots], page_size = 5, selectable = False)
         paginator.pilots = {p.en_name: p for p in pilots}
         return paginator
@@ -493,7 +493,7 @@ class IronSaga(commands.Cog):
                 }
             }
         ]):
-            pilots.append(PilotReductSkills(**doc))
+            pilots.append(PilotReducedSkills(**doc))
 
         if pilots:
             paginator = SkillPaginator.from_pilots(pilots)
