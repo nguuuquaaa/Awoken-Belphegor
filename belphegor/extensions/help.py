@@ -11,6 +11,7 @@ from belphegor.templates.discord_types import Interaction
 class Help(commands.Cog):
     def __init__(self, bot: Belphegor):
         self.bot = bot
+        self.bot.remove_command("help")
 
     @ac.command(name = "belhelp")
     async def belhelp(
