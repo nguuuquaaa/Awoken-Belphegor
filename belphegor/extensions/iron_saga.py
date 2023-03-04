@@ -11,6 +11,7 @@ import time
 import traceback
 
 from belphegor import errors, utils
+from belphegor.settings import settings
 from belphegor.utils import CircleIter, grouper, wiki
 from belphegor.templates import ui_ex, paginators, queries, checks
 from belphegor.templates.discord_types import Interaction, File
@@ -573,9 +574,8 @@ class IronSaga(commands.Cog):
         else:
             await interaction.response.send_message(embed = pets[0].display())
 
-    update = ac.Group(name = "update", description = "Update database")
-
-    @update.command(name = "pilot")
+    @ac.command(name = "update_pilot")
+    @ac.guilds(*settings.TEST_GUILDS)
     @ac.check(checks.owner_only())
     async def update_pilot(self, interaction: Interaction, name: typing.Optional[str] = None):
         await interaction.response.defer(thinking = True)
@@ -755,7 +755,8 @@ class IronSaga(commands.Cog):
 
         return pilot
 
-    @update.command(name = "part")
+    @ac.command(name = "update_part")
+    @ac.guilds(*settings.TEST_GUILDS)
     @ac.check(checks.owner_only())
     async def update_part(self, interaction: Interaction, message_id: str):
         try:
@@ -773,7 +774,8 @@ class IronSaga(commands.Cog):
             await col.insert_one(doc)
         await interaction.response.send_message("Done.")
 
-    @update.command(name = "pet")
+    @ac.command(name = "update_pet")
+    @ac.guilds(*settings.TEST_GUILDS)
     @ac.check(checks.owner_only())
     async def update_pet(self, interaction: Interaction, message_id: str):
         try:

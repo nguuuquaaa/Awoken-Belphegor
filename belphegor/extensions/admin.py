@@ -13,6 +13,7 @@ import typing
 import enum
 
 from belphegor import utils
+from belphegor.settings import settings
 from belphegor.bot import Belphegor
 from belphegor.errors import FlowControl
 from belphegor.templates import ui_ex, checks, panels, paginators
@@ -33,7 +34,7 @@ class Admin(commands.Cog):
 
     @ac.command(name = "reload")
     @ac.describe(extension = "Extension to reload")
-    @ac.guilds(306527473997316097, 376585779536723970, 738232588279218338)
+    @ac.guilds(*settings.TEST_GUILDS)
     @ac.check(checks.owner_only())
     async def reload(
         self,
@@ -59,7 +60,7 @@ class Admin(commands.Cog):
 
     @ac.command(name = "reimport")
     @ac.describe(module = "Module to reimport")
-    @ac.guilds(306527473997316097, 376585779536723970, 738232588279218338)
+    @ac.guilds(*settings.TEST_GUILDS)
     @ac.check(checks.owner_only())
     async def reimport(
         self,

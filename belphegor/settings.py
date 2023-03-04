@@ -1,4 +1,4 @@
-from pydantic import BaseSettings
+from pydantic import BaseSettings, validator
 
 #=============================================================================================================================#
 
@@ -14,10 +14,11 @@ class BelphegorSettings(BaseSettings):
     GFWIKI_BOT_USERNAME: str
     GFWIKI_BOT_PASSWORD: str
 
-    LOG_CHANNEL_ID: int
-
     LOGGER: str = "belphegor"
     LOG_LEVEL: str = "DEBUG"
     LOG_FORMAT: str = "%(asctime)s - %(levelname)s - %(message)s"
+
+    LOG_CHANNEL_ID: int
+    TEST_GUILDS: list[int]
 
 settings = BelphegorSettings(_env_file = ".env", _env_file_encoding = "utf-8")
