@@ -242,6 +242,7 @@ class ISSkinsButton(ui_ex.SkinsButton):
     async def callback(self, interaction: Interaction):
         paginator = self.paginator
         paginator.show_next_skin_set()
+        self.label = f"Skins ({paginator.skins.current_index + 1} / {len(paginator.skins)})"
         await paginator.update(interaction)
 
 class ISSkinSelect(ui_ex.SelectOne):
@@ -275,7 +276,7 @@ class PilotDisplay(paginators.BasePaginator):
         view = ui_ex.StandardView()
         view.add_item(self.get_paginator_attribute("stat_button", row = 1))
         view.add_item(self.get_paginator_attribute("trivia_button", row = 1))
-        view.add_item(self.get_paginator_attribute("skin_button", row = 1))
+        view.add_item(self.get_paginator_attribute("skin_button", row = 1, label = f"Skins (1 / {len(self.skins)})"))
         view.add_exit_button(row = 1)
         self.panel.view = view
 
@@ -283,7 +284,7 @@ class PilotDisplay(paginators.BasePaginator):
 
     def show_next_skin_set(self):
         if getattr(self, "skin_select", None):
-            self.remove_item(self.skin_select)
+            self.panel.view.remove_item(self.skin_select)
 
         next(self.skins)
         set_index, batch = self.skins.current(True)
