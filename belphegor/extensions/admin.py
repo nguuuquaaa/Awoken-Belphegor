@@ -132,18 +132,19 @@ class Admin(commands.Cog):
     async def sync(
         self,
         ctx: commands.Context,
-        scope: typing.Literal["guild", "global"] = "global",
+        scope: typing.Literal["guild", "guilds", "global"] = "global",
         *guild_ids: int
     ):
         async with ctx.typing():
             await self.bot.tree.sync()
             match scope:
-                case "guild":
+                case "guild" | "guilds":
                     if guild_ids:
                         for guild_id in guild_ids:
                             await self.bot.tree.sync(guild = discord.Object(guild_id))
                     else:
-                        await self.bot.tree.sync(guild = ctx.guild)
+                        for guild_id in settings.TEST_GUILDS:
+                            await self.bot.tree.sync(guild = discord.Object(guild_id))
                 case "global":
                     await self.bot.tree.sync()
         await ctx.send("Synced.")
