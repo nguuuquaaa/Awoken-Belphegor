@@ -12,7 +12,7 @@ import traceback
 
 from belphegor import errors, utils
 from belphegor.settings import settings
-from belphegor.utils import CircleIter, grouper, wiki
+from belphegor.utils import wiki
 from belphegor.templates import ui_ex, paginators, queries, checks
 from belphegor.templates.discord_types import Interaction, File
 
@@ -218,7 +218,7 @@ class PilotSelector(paginators.SingleRowPaginator):
 
 #=============================================================================================================================#
 
-class ISStatsButton(ui_ex.StatsButton):
+class PilotStatsButton(ui_ex.StatsButton):
     emoji = discord.PartialEmoji(name = "exp_capsule", id = 824327490536341504)
 
     paginator: "PilotDisplay"
@@ -228,7 +228,7 @@ class ISStatsButton(ui_ex.StatsButton):
         paginator.render = partial(paginator.pilot.display_stats_info, paginator)
         await paginator.update(interaction)
 
-class ISTriviaButton(ui_ex.TriviaButton):
+class PilotTriviaButton(ui_ex.TriviaButton):
     paginator: "PilotDisplay"
 
     async def callback(self, interaction: Interaction):
@@ -236,7 +236,7 @@ class ISTriviaButton(ui_ex.TriviaButton):
         paginator.render = partial(paginator.pilot.display_other_info, paginator)
         await paginator.update(interaction)
 
-class ISSkinsButton(ui_ex.SkinsButton):
+class PilotSkinsButton(ui_ex.SkinsButton):
     paginator: "PilotDisplay"
 
     async def callback(self, interaction: Interaction):
@@ -245,7 +245,7 @@ class ISSkinsButton(ui_ex.SkinsButton):
         self.label = f"Skins ({paginator.skins.current_index + 1} / {len(paginator.skins)})"
         await paginator.update(interaction)
 
-class ISSkinSelect(ui_ex.SelectOne):
+class PilotSkinSelect(ui_ex.SelectOne):
     placeholder = "Select skin to display"
 
     paginator: "PilotDisplay"
@@ -260,24 +260,25 @@ class PilotDisplay(paginators.BasePaginator):
     SKIN_SELECT_SIZE = 20
 
     pilot: Pilot
-    skins: CircleIter[CircleIter[PilotSkin]]
+    skins: utils.CircleIter[utils.CircleIter[PilotSkin]]
 
-    stat_button: ISStatsButton
-    trivia_button: ISTriviaButton
-    skin_button: ISSkinsButton
-    skin_select: ISSkinSelect
+    stats_button: PilotStatsButton
+    trivia_button: PilotTriviaButton
+    skin_button: PilotSkinsButton
+    skin_select: PilotSkinSelect
 
     def __init__(self, pilot: Pilot):
         super().__init__()
         self.pilot = pilot
-        self.skins = CircleIter([CircleIter(s, start_index = 0) for s in grouper(pilot.skins, self.SKIN_SELECT_SIZE, incomplete = "missing")], start_index = -1)
+        self.skins = utils.CircleIter([utils.CircleIter(s, start_index = 0) for s in utils.grouper(pilot.skins, self.SKIN_SELECT_SIZE, incomplete = "missing")], start_index = -1)
         self.render = partial(self.pilot.display_stats_info, self)
 
         view = ui_ex.StandardView()
-        view.add_item(self.get_paginator_attribute("stat_button", row = 1))
+        view.add_item(self.get_paginator_attribute("stats_button", row = 1))
         view.add_item(self.get_paginator_attribute("trivia_button", row = 1))
-        view.add_item(self.get_paginator_attribute("skin_button", row = 1, label = f"Skins (1 / {len(self.skins)})"))
-        view.add_exit_button(row = 1)
+        if len(self.skins) > 1:
+            view.add_item(self.get_paginator_attribute("skin_button", row = 1, label = f"Skins (1 / {len(self.skins)})"))
+        view.add_exit_button(row = 2)
         self.panel.view = view
 
         self.show_next_skin_set()

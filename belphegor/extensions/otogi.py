@@ -218,10 +218,10 @@ class DaemonDisplay(paginators.BasePaginator):
         self.render = functools.partial(daemon.display_stats, self)
 
         view = ui_ex.StandardView()
-        view.add_item(self.get_paginator_attribute("stats_button"))
-        view.add_item(self.get_paginator_attribute("trivia_button"))
-        view.add_item(self.get_paginator_attribute("image_button"))
-        view.add_exit_button()
+        view.add_item(self.get_paginator_attribute("stats_button", row = 0))
+        view.add_item(self.get_paginator_attribute("trivia_button", row = 0))
+        view.add_item(self.get_paginator_attribute("image_button", row = 0))
+        view.add_exit_button(row = 1)
         self.panel.view = view
 
 #=============================================================================================================================#

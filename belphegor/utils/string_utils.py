@@ -96,7 +96,7 @@ def split_page(text: str, split_len: int, *, check: Callable[[str], bool] = str.
         clean = str.strip
     else:
         clean = lambda s: s.strip(strip)
-    for word in split_iter(text, check=check):
+    for word in split_iter(text, check = check):
         if safe_mode:
             if word.startswith(("http://", "https://")):
                 word = safe_url(word)
@@ -113,13 +113,13 @@ def split_page(text: str, split_len: int, *, check: Callable[[str], bool] = str.
                 left = split_len - cur_len
                 cur_node.append(word[:left])
                 description_page.append(f"{fix}{clean(''.join(cur_node))}{fix}")
-                stuff = (f"{fix}{clean(word[i+left:i+split_len+left])}{fix}" for i in range(0, len(word)-left, split_len))
+                stuff = (f"{fix}{clean(word[i + left:i + split_len + left])}{fix}" for i in range(0, len(word) - left, split_len))
                 description_page.extend(stuff)
                 word = description_page.pop(-1)[len_fix:-len_fix]
             cur_node = [word]
             cur_len = len(word)
     if cur_node:
-        description_page.append(fix+clean(''.join(cur_node)))
+        description_page.append(fix + clean(''.join(cur_node)))
     else:
         description_page[-1] = description_page[-1][:-len_fix]
     description_page[0] = description_page[0][len_fix:]

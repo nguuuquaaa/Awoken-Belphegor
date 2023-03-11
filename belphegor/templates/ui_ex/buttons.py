@@ -28,10 +28,26 @@ class Button(items.Item[_V], ui.Button[_V]):
     async def callback(self, interaction: Interaction):
         pass
 
-class InputButton(Button[_V]):
+class BlueButton(Button[_V]):
+    style: discord.ButtonStyle = discord.ButtonStyle.primary
+
+class GrayButton(Button[_V]):
+    style: discord.ButtonStyle = discord.ButtonStyle.secondary
+
+class GreenButton(Button[_V]):
+    style: discord.ButtonStyle = discord.ButtonStyle.success
+
+class RedButton(Button[_V]):
+    style: discord.ButtonStyle = discord.ButtonStyle.danger
+
+class URLButton(Button[_V]):
+    style: discord.ButtonStyle = discord.ButtonStyle.link
+
+#=============================================================================================================================#
+
+class InputButton(BlueButton[_V]):
     label: str = "Input"
     emoji: EmojiType = "\U0001f4dd"
-    style: discord.ButtonStyle = discord.ButtonStyle.primary
 
     input_modal: modals.InputModal
 
@@ -43,57 +59,48 @@ class InputButton(Button[_V]):
         modal = self.create_modal()
         await interaction.response.send_modal(modal)
 
-class HomeButton(Button[_V]):
+class HomeButton(BlueButton[_V]):
     label: str = "Home"
     emoji: EmojiType = "\U0001f3e0"
-    style: discord.ButtonStyle = discord.ButtonStyle.primary
 
-class ExitButton(Button[_V]):
+class ExitButton(GrayButton[_V]):
     label: str = "Exit"
     emoji: EmojiType = "\u274c"
-    style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
     async def callback(self, interaction: Interaction):
         self.view.stop()
         for item in self.view.children:
             item.disabled = True
-        self.view.stop()
 
         await interaction.response.edit_message(view = self.view)
 
-class ConfirmedButton(Button[_V]):
+class ConfirmedButton(GrayButton[_V]):
     label: str = None
     emoji: EmojiType = "\u2705"
-    style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
-class DeniedButton(Button[_V]):
+class DeniedButton(GrayButton[_V]):
     label: str = None
     emoji: EmojiType = "\u2716"
-    style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
 #=============================================================================================================================#
 
-class NextButton(Button[_V]):
+class NextButton(GrayButton[_V]):
     label: str = None
     emoji: EmojiType = "\u25b6"
-    style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
-class PreviousButton(Button[_V]):
+class PreviousButton(GrayButton[_V]):
     label: str = None
     emoji: EmojiType = "\u25c0"
-    style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
-class JumpForwardButton(Button[_V]):
+class JumpForwardButton(GrayButton[_V]):
     jump: int = 5
     label: str = "Forward 5"
     emoji: EmojiType = "\u23e9"
-    style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
-class JumpBackwardButton(Button[_V]):
+class JumpBackwardButton(GrayButton[_V]):
     jump: int = 5
     label: str = "Back 5"
     emoji: EmojiType = "\u23ea"
-    style: discord.ButtonStyle = discord.ButtonStyle.secondary
 
 class JumpToButton(InputButton[_V]):
     label: str = "Jump to"
@@ -107,17 +114,14 @@ class JumpToButton(InputButton[_V]):
 
 #=============================================================================================================================#
 
-class StatsButton(Button[_V]):
+class StatsButton(BlueButton[_V]):
     label: str = "Stats"
     emoji: EmojiType = None
-    style: discord.ButtonStyle = discord.ButtonStyle.primary
 
-class TriviaButton(Button[_V]):
+class TriviaButton(BlueButton[_V]):
     label: str = "Trivia"
     emoji: EmojiType = "\U0001f5d2"
-    style: discord.ButtonStyle = discord.ButtonStyle.primary
 
-class SkinsButton(Button[_V]):
+class SkinsButton(BlueButton[_V]):
     label: str = "Skins"
     emoji: EmojiType = "\U0001f5bc"
-    style: discord.ButtonStyle = discord.ButtonStyle.primary
