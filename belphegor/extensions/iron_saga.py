@@ -187,8 +187,10 @@ class PilotSelectMenu(paginators.PaginatorSelect):
 
     async def callback(self, interaction: Interaction):
         pilot = self.paginator.pilots[self.values[0]]
-        paginator = PilotDisplay(pilot)
-        await paginator.initialize(interaction)
+        new_paginator = PilotDisplay(pilot)
+        new_paginator.panel.target_message = self.paginator.panel.target_message
+        self.paginator.panel.stop()
+        await new_paginator.initialize(interaction)
 
 class PilotSelector(paginators.SingleRowPaginator):
     pilots: dict[str, Pilot]

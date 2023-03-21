@@ -140,3 +140,14 @@ class Panel:
         "Stop listening."
         if self.view:
             self.view.stop()
+
+    def update(self, panel: "Panel"):
+        self.target_message =  self.target_message if panel.target_message is None else panel.target_message
+        self.tts = panel.tts
+        self.ephemeral = panel.ephemeral
+        for key in ("content", "embed", "embeds", "file", "files", "allowed_mentions"):
+            value = getattr(panel, key)
+            if value is not MISSING:
+                setattr(self, key, value)
+
+        return self

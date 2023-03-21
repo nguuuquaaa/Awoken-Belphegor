@@ -154,8 +154,10 @@ class DaemonSelectMenu(paginators.PaginatorSelect):
 
     async def callback(self, interaction: Interaction):
         daemon = self.paginator.daemons[self.values[0]]
-        paginator = DaemonDisplay(daemon)
-        await paginator.initialize(interaction)
+        new_paginator = DaemonDisplay(daemon)
+        new_paginator.panel.target_message = self.paginator.panel.target_message
+        self.paginator.panel.stop()
+        await new_paginator.initialize(interaction)
 
 class DaemonSelector(paginators.SingleRowPaginator):
     daemons: dict[str, Daemon]

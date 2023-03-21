@@ -138,13 +138,13 @@ class BasePaginator:
         return self.panel
 
     async def update(self, interaction: Interaction):
-        panel = self.render()
-        await panel.reply(interaction)
+        self.render()
+        await self.panel.reply(interaction)
 
     async def initialize(self, interaction: Interaction):
-        panel = self.render()
-        panel.view.allowed_user = interaction.user
-        await panel.reply(interaction)
+        self.render()
+        self.panel.view.allowed_user = interaction.user
+        await self.panel.reply(interaction)
 
     def get_paginator_attribute(self, key: str, *args, **kwargs):
         value = utils.get_default_attribute(self, key, *args, **kwargs)
