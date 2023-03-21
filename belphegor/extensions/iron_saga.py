@@ -131,7 +131,7 @@ class Pilot(BaseModel):
     description: str | None
     skins: list[PilotSkin]
 
-    def display_stats_info(self, paginator: "PilotDisplay"):
+    def stats_embed(self):
         embed = discord.Embed(
             title = self.en_name or self.page_name,
             color = discord.Color.red(),
@@ -162,14 +162,9 @@ class Pilot(BaseModel):
                 inline=False
             )
 
-        skin = paginator.skins.current().current()
-        paginator.skin_select.placeholder = skin.name
-        embed.set_image(url = skin.url)
+        return embed
 
-        paginator.panel.embed = embed
-        return paginator.panel
-
-    def display_other_info(self, paginator: "PilotDisplay"):
+    def trivia_embed(self):
         embed = discord.Embed(
             title = self.en_name or self.page_name,
             description = self.description or "N/A",
@@ -180,12 +175,7 @@ class Pilot(BaseModel):
         embed.add_field(name = "Artist", value = self.artist or "N/A")
         embed.add_field(name = "Voice actor", value = self.voice_actor or "N/A")
 
-        skin = paginator.skins.current().current()
-        paginator.skin_select.placeholder = skin.name
-        embed.set_image(url = skin.url)
-
-        paginator.panel.embed = embed
-        return paginator.panel
+        return embed
 
 class PilotReducedSkills(Pilot):
     skills: tuple[PilotSkill, ...]
@@ -225,7 +215,7 @@ class PilotStatsButton(ui_ex.StatsButton):
 
     async def callback(self, interaction: Interaction):
         paginator = self.paginator
-        paginator.render = partial(paginator.pilot.display_stats_info, paginator)
+        paginator.panel.embed = paginator.pilot.stats_embed()
         await paginator.update(interaction)
 
 class PilotTriviaButton(ui_ex.TriviaButton):
@@ -233,7 +223,7 @@ class PilotTriviaButton(ui_ex.TriviaButton):
 
     async def callback(self, interaction: Interaction):
         paginator = self.paginator
-        paginator.render = partial(paginator.pilot.display_other_info, paginator)
+        paginator.panel.embed = paginator.pilot.trivia_embed()
         await paginator.update(interaction)
 
 class PilotSkinsButton(ui_ex.SkinsButton):
@@ -271,7 +261,6 @@ class PilotDisplay(paginators.BasePaginator):
         super().__init__()
         self.pilot = pilot
         self.skins = utils.CircleIter([utils.CircleIter(s, start_index = 0) for s in utils.grouper(pilot.skins, self.SKIN_SELECT_SIZE, incomplete = "missing")], start_index = -1)
-        self.render = partial(self.pilot.display_stats_info, self)
 
         view = ui_ex.StandardView()
         view.add_item(self.get_paginator_attribute("stats_button", row = 1))
@@ -282,6 +271,7 @@ class PilotDisplay(paginators.BasePaginator):
         self.panel.view = view
 
         self.show_next_skin_set()
+        self.panel.embed = pilot.stats_embed()
 
     def show_next_skin_set(self):
         if getattr(self, "skin_select", None):
@@ -298,6 +288,12 @@ class PilotDisplay(paginators.BasePaginator):
             )
         self.skin_select = skin_select
         self.panel.view.add_item(skin_select)
+
+    def render(self):
+        skin = self.skins.current().current()
+        self.skin_select.placeholder = skin.name
+        self.panel.embed.set_image(url = skin.url)
+        return self.panel
 
 #=============================================================================================================================#
 
