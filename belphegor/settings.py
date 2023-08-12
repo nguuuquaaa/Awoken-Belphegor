@@ -21,6 +21,8 @@ class BelphegorSettings(BaseSettings):
     LOG_CHANNEL_ID: int
     TEST_GUILDS: list[int]
 
+    EQ_ALERT_API_USER_AGENT: str
+
     model_config = SettingsConfigDict(env_file = ".env", env_file_encoding = "utf-8")
 
 settings = BelphegorSettings()
