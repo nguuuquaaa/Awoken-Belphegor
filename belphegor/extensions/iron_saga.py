@@ -9,6 +9,7 @@ import json
 from functools import partial
 import time
 import traceback
+import math
 
 from belphegor import errors, utils
 from belphegor.settings import settings
@@ -28,17 +29,9 @@ log = utils.get_logger()
 ISWIKI_BASE = "https://ironsaga.fandom.com"
 ISWIKI_API = f"{ISWIKI_BASE}/api.php"
 
-COPILOT_SLOTS = {
-    "attack": "Attack",
-    "tech": "Tech",
-    "defense": "Defense",
-    "support": "Support",
-    "control": "Control",
-    "special": "Special"
-}
-
 #=============================================================================================================================#
 
+skills = {}
 parser = wiki.WikitextParser()
 
 @parser.set_box_handler("PilotInfo")
@@ -49,6 +42,13 @@ def handle_base_box(box, **kwargs):
 @parser.set_box_handler("PilotIcon")
 def handle_icon_box(box, name, *args, **kwargs):
     return name
+
+@parser.set_box_handler("Skill")
+def handle_icon_box(box, name, key):
+    try:
+        return skills[name][key]
+    except KeyError:
+        return f"{name}_{key}"
 
 @parser.set_html_handler
 def handle_html(tag, text, **kwargs):
@@ -68,6 +68,30 @@ def handle_reference(box, *args, **kwargs):
 
 #=============================================================================================================================#
 
+COPILOT_SLOTS = {
+    "attack": "Attack",
+    "tech": "Tech",
+    "defense": "Defense",
+    "support": "Support",
+    "control": "Control",
+    "special": "Special"
+}
+
+LEVEL_CAP = 90
+
+RANK_STAT = {
+    1: 0,
+    2: 30,
+    3: 60,
+    4: 90,
+    5: 130,
+    6: 170,
+    7: 210,
+    8: 260,
+    9: 310,
+    10: 360
+}
+
 PilotPersonality: typing.TypeAlias = typing.Literal[
     "Brave",
     "Calm",
@@ -86,10 +110,48 @@ PilotPersonality: typing.TypeAlias = typing.Literal[
 ]
 
 class PilotStats(BaseModel):
-    melee: int = Field(..., gt = 0)
-    ranged: int = Field(..., gt = 0)
-    defense: int = Field(..., gt = 0)
-    reaction: int = Field(..., gt = 0)
+    melee_growth: float = Field(..., gt = 0)
+    ranged_growth: float = Field(..., gt = 0)
+    defense_growth: float = Field(..., gt = 0)
+    reaction_growth: float = Field(..., gt = 0)
+
+    @staticmethod
+    def get_stat(growth: float, *, level: typing.Annotated[int, 1, LEVEL_CAP] = LEVEL_CAP, rank: typing.Annotated[int, 1, 10] = 10):
+        return int(growth * (level + 9) + RANK_STAT[rank])
+
+    @staticmethod
+    def get_growth(stat: int, *, level: typing.Annotated[int, 1, LEVEL_CAP] = LEVEL_CAP, rank: typing.Annotated[int, 1, 10] = 10):
+        return math.ceil((stat - RANK_STAT[rank]) / (level + 9) * 10) / 10
+
+    @property
+    def melee(self):
+        return self.get_stat(self.melee_growth)
+
+    @property
+    def ranged(self):
+        return self.get_stat(self.ranged_growth)
+
+    @property
+    def defense(self):
+        return self.get_stat(self.defense_growth)
+
+    @property
+    def reaction(self):
+        return self.get_stat(self.reaction_growth)
+
+    @classmethod
+    def estimated_from_stats(cls, melee: int, ranged: int, defense: int, reaction: int):
+        if any(s >= 750 for s in [melee, ranged, defense, reaction]):
+            est_level = 90
+        else:
+            est_level = 75
+
+        return cls(
+            melee_growth = cls.get_growth(melee, level = est_level),
+            ranged_growth = cls.get_growth(ranged, level = est_level),
+            defense_growth = cls.get_growth(defense, level = est_level),
+            reaction_growth = cls.get_growth(reaction, level = est_level)
+        )
 
 class PilotSkill(BaseModel):
     name: str = Field(..., min_length = 1)
@@ -103,7 +165,7 @@ class PilotSkin(BaseModel):
     @classmethod
     def from_filename(cls, filename: str) -> dict:
         name = filename[:-4].replace("_", " ").replace(" Render", "")
-        return cls.construct(
+        return cls(
             name = name,
             url = f"{ISWIKI_BASE}/{wiki.generate_image_path(filename)}"
         )
@@ -579,6 +641,22 @@ class IronSaga(commands.Cog):
     @ac.check(checks.owner_only())
     async def update_pilot(self, interaction: Interaction, name: typing.Optional[str] = None):
         await interaction.response.defer(thinking = True)
+
+        # skills.json
+        resp = await self.bot.session.get(
+            ISWIKI_API,
+            params = {
+                "action":       "parse",
+                "prop":         "wikitext",
+                "page":         "Template:Skills.json",
+                "format":       "json",
+                "redirects":    1
+            }
+        )
+        raw = json.loads(await resp.content.read())
+        skills.update(json.loads(raw["parse"]["wikitext"]["*"]))
+
+        # pilot parsing
         if name is None:
             params = {
                 "action":       "parse",
@@ -712,7 +790,7 @@ class IronSaga(commands.Cog):
             faction = basic_info["affiliation"],
             artist = basic_info.get("artist"),
             voice_actor = basic_info.get("seiyuu"),
-            stats = PilotStats(
+            stats = PilotStats.estimated_from_stats(
                 melee = utils.to_int(basic_info["meleemax"]),
                 ranged = utils.to_int(basic_info["shootingmax"]),
                 defense = utils.to_int(basic_info["defensemax"]),
@@ -750,8 +828,6 @@ class IronSaga(commands.Cog):
             ),
             skins = list(skins.values())
         )
-
-        print(pilot)
 
         return pilot
 
