@@ -13,7 +13,7 @@ services:
   belphegor:
     image: nguuuquaaa/belphegor:latest
     container_name: belphegor
-    command: python3.10 run.py
+    command: python3.11 run.py
     restart: always
     environment:
       LOGGER: belphegor
