@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #=============================================================================================================================#
 
@@ -21,4 +21,6 @@ class BelphegorSettings(BaseSettings):
     LOG_CHANNEL_ID: int
     TEST_GUILDS: list[int]
 
-settings = BelphegorSettings(_env_file = ".env", _env_file_encoding = "utf-8")
+    model_config = SettingsConfigDict(env_file = ".env", env_file_encoding = "utf-8")
+
+settings = BelphegorSettings()
