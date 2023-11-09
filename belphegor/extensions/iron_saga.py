@@ -210,7 +210,7 @@ class Pilot(BaseModel):
         )
 
         embed.add_field(name = "Personality", value = self.personality)
-        embed.add_field(name = "Copilot slots", value = " | ".join(k for k, v in self.copilot_slots.dict().items() if v), inline = False)
+        embed.add_field(name = "Copilot slots", value = " | ".join(k for k, v in self.copilot_slots.model_dump().items() if v), inline = False)
 
         for sk, dot in zip(self.skills, ["\u25CF", "\u00B7", "\u00B7", "\u00B7"]):
             copilot = sk.copilot
@@ -704,7 +704,7 @@ class IronSaga(commands.Cog):
                         "index": index
                     },
                     {
-                        "$set": pilot.dict(),
+                        "$set": pilot.model_dump(),
                         "$setOnInsert": {
                             "aliases": []
                         }

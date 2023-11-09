@@ -2,7 +2,7 @@ import discord
 import typing
 from collections.abc import Callable
 import asyncio
-from pydantic.generics import GenericModel
+from pydantic import BaseModel
 import abc
 
 from belphegor import utils
@@ -20,7 +20,7 @@ _V = typing.TypeVar("_V", bound = ui_ex.StandardView)
 _VT = typing.TypeVar("_VT")
 _PageItem_VT = typing.ForwardRef("PageItem[_VT]")
 
-class PageItem(GenericModel, typing.Generic[_VT]):
+class PageItem(BaseModel, typing.Generic[_VT]):
     value: _VT
     children: list[_PageItem_VT] = []
 
@@ -36,11 +36,11 @@ class PageItem(GenericModel, typing.Generic[_VT]):
             else:
                 return self.children[key[0]][key[1:]]
 
-PageItem.update_forward_refs()
+PageItem.model_rebuild()
 
 #=============================================================================================================================#
 
-class EmbedTemplate(GenericModel, typing.Generic[_VT]):
+class EmbedTemplate(BaseModel, typing.Generic[_VT]):
     title: str | None = None
     url: str | None = None
     colour: discord.Colour | None = None
@@ -123,7 +123,7 @@ class EmbedTemplate(GenericModel, typing.Generic[_VT]):
 
         return embed
 
-EmbedTemplate.update_forward_refs()
+EmbedTemplate.model_rebuild()
 
 #=============================================================================================================================#
 
