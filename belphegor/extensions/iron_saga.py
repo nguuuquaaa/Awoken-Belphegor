@@ -39,6 +39,10 @@ parser = wiki.WikitextParser()
 def handle_base_box(box, **kwargs):
     return {"pilot_info": kwargs}
 
+@parser.set_box_handler("PilotInfov2")
+def handle_base_box_v2(box, **kwargs):
+    return {"pilot_info_v2": kwargs}
+
 @parser.set_box_handler("PilotIcon")
 def handle_icon_box(box, name, *args, **kwargs):
     return name
@@ -110,8 +114,8 @@ PilotPersonality: typing.TypeAlias = typing.Literal[
 ]
 
 class PilotStats(BaseModel):
-    melee_growth: float = Field(..., gt = 0)
     ranged_growth: float = Field(..., gt = 0)
+    melee_growth: float = Field(..., gt = 0)
     defense_growth: float = Field(..., gt = 0)
     reaction_growth: float = Field(..., gt = 0)
 
@@ -124,12 +128,12 @@ class PilotStats(BaseModel):
         return math.ceil((stat - RANK_STAT[rank]) / (level + 9) * 10) / 10
 
     @property
-    def melee(self):
-        return self.get_stat(self.melee_growth)
-
-    @property
     def ranged(self):
         return self.get_stat(self.ranged_growth)
+
+    @property
+    def melee(self):
+        return self.get_stat(self.melee_growth)
 
     @property
     def defense(self):
@@ -147,8 +151,8 @@ class PilotStats(BaseModel):
             est_level = 75
 
         return cls(
-            melee_growth = cls.get_growth(melee, level = est_level),
             ranged_growth = cls.get_growth(ranged, level = est_level),
+            melee_growth = cls.get_growth(melee, level = est_level),
             defense_growth = cls.get_growth(defense, level = est_level),
             reaction_growth = cls.get_growth(reaction, level = est_level)
         )
@@ -188,6 +192,7 @@ class Pilot(BaseModel):
     personality: PilotPersonality
     copilot_slots: PilotCopilotSlots
     skills: tuple[PilotSkill, PilotSkill, PilotSkill, PilotSkill]
+    awaken_skills: tuple[()] | tuple[PilotSkill, PilotSkill, PilotSkill, PilotSkill]
     artist: str | None
     voice_actor: str | None
     description: str | None
@@ -203,8 +208,8 @@ class Pilot(BaseModel):
         stats = self.stats
         embed.add_field(
             name = "Stats",
-            value = f"Melee: {stats.melee}\n"
-                f"Ranged: {stats.ranged}\n"
+            value = f"Ranged: {stats.ranged}\n"
+                f"Melee: {stats.melee}\n"
                 f"Defense: {stats.defense}\n"
                 f"Reaction: {stats.reaction}"
         )
@@ -213,6 +218,39 @@ class Pilot(BaseModel):
         embed.add_field(name = "Copilot slots", value = " | ".join(k for k, v in self.copilot_slots.model_dump().items() if v), inline = False)
 
         for sk, dot in zip(self.skills, ["\u25CF", "\u00B7", "\u00B7", "\u00B7"]):
+            copilot = sk.copilot
+            if copilot:
+                copilot = f" [{copilot}]"
+            else:
+                copilot = ""
+            embed.add_field(
+                name=f"{dot} {sk.name}{copilot}",
+                value=sk.effect,
+                inline=False
+            )
+
+        return embed
+
+    def awaken_stats_embed(self):
+        embed = discord.Embed(
+            title = self.en_name or self.page_name,
+            color = discord.Color.red(),
+            url = f"{ISWIKI_BASE}/wiki/{quote(self.page_name)}"
+        )
+
+        stats = self.stats
+        embed.add_field(
+            name = "Stats",
+            value = f"Ranged: {stats.ranged + 200}\n"
+                f"Melee: {stats.melee + 200}\n"
+                f"Defense: {stats.defense + 200}\n"
+                f"Reaction: {stats.reaction + 200}"
+        )
+
+        embed.add_field(name = "Personality", value = self.personality)
+        embed.add_field(name = "Copilot slots", value = " | ".join(k for k, v in self.copilot_slots.model_dump().items() if v), inline = False)
+
+        for sk, dot in zip(self.awaken_skills, ["\u25CF", "\u00B7", "\u00B7", "\u00B7"]):
             copilot = sk.copilot
             if copilot:
                 copilot = f" [{copilot}]"
@@ -282,6 +320,17 @@ class PilotStatsButton(ui_ex.StatsButton):
         paginator.panel.embed = paginator.pilot.stats_embed()
         await paginator.update(interaction)
 
+class PilotAwakenStatsButton(ui_ex.StatsButton):
+    label = "Awaken"
+    emoji = discord.PartialEmoji(name = "woke_coin", id = 1172225270263074856)
+
+    paginator: "PilotDisplay"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+        paginator.panel.embed = paginator.pilot.awaken_stats_embed()
+        await paginator.update(interaction)
+
 class PilotTriviaButton(ui_ex.TriviaButton):
     paginator: "PilotDisplay"
 
@@ -317,6 +366,7 @@ class PilotDisplay(paginators.BasePaginator):
     skins: utils.CircleIter[utils.CircleIter[PilotSkin]]
 
     stats_button: PilotStatsButton
+    awaken_button: PilotAwakenStatsButton
     trivia_button: PilotTriviaButton
     skin_button: PilotSkinsButton
     skin_select: PilotSkinSelect
@@ -328,6 +378,8 @@ class PilotDisplay(paginators.BasePaginator):
 
         view = ui_ex.StandardView()
         view.add_item(self.get_paginator_attribute("stats_button", row = 1))
+        if pilot.awaken_skills:
+            view.add_item(self.get_paginator_attribute("awaken_button", row = 1))
         view.add_item(self.get_paginator_attribute("trivia_button", row = 1))
         if len(self.skins) > 1:
             view.add_item(self.get_paginator_attribute("skin_button", row = 1, label = f"Skins (1 / {len(self.skins)})"))
@@ -748,8 +800,14 @@ class IronSaga(commands.Cog):
             if isinstance(item, dict):
                 skin_galleries = []
 
-                if "pilot_info" in item:
-                    basic_info = item["pilot_info"]
+                if "pilot_info" in item or "pilot_info_v2" in item:
+                    try:
+                        basic_info = item["pilot_info"]
+                        v2 = False
+                    except KeyError:
+                        basic_info = item["pilot_info_v2"]
+                        v2 = True
+
                     elem = basic_info["image"]
                     try:
                         tabber = elem[0]["tabber"]
@@ -780,54 +838,126 @@ class IronSaga(commands.Cog):
                             filename = filename[5:]
                         skins.setdefault(filename, PilotSkin.from_filename(filename))
 
-        pilot = Pilot(
-            index = page_id,
-            en_name = basic_info["name (english/romaji)"],
-            jp_name = basic_info["name (original)"],
-            page_name = raw["parse"]["title"],
-            description = basic_info.get("background"),
-            personality = basic_info["personality"],
-            faction = basic_info["affiliation"],
-            artist = basic_info.get("artist"),
-            voice_actor = basic_info.get("seiyuu"),
-            stats = PilotStats.estimated_from_stats(
-                melee = utils.to_int(basic_info["meleemax"]),
-                ranged = utils.to_int(basic_info["shootingmax"]),
-                defense = utils.to_int(basic_info["defensemax"]),
-                reaction = utils.to_int(basic_info["reactionmax"])
-            ),
-            skills = (
-                PilotSkill(
-                    name = basic_info["activeskillname"],
-                    effect = basic_info["activeskilleffect"],
-                    copilot = COPILOT_SLOTS.get(basic_info.get("activeskilltype", "").lower())
+        if v2:
+            pilot = Pilot(
+                index = page_id,
+                en_name = basic_info["name (english/romaji)"],
+                jp_name = basic_info["name (original)"],
+                page_name = raw["parse"]["title"],
+                description = basic_info.get("background"),
+                personality = basic_info["personality"],
+                faction = basic_info["affiliation"],
+                artist = basic_info.get("artist"),
+                voice_actor = basic_info.get("seiyuu"),
+                stats = PilotStats(
+                    ranged_growth = basic_info["rangedgrowth"],
+                    melee_growth = basic_info["meleegrowth"],
+                    defense_growth = basic_info["defensegrowth"],
+                    reaction_growth = basic_info["reactiongrowth"],
                 ),
-                PilotSkill(
-                    name = basic_info["passiveskill1name"],
-                    effect = basic_info["passiveskill1effect"],
-                    copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill1type", "").lower())
+                skills = (
+                    PilotSkill(
+                        name = skills[basic_info["activeskill"]]["name"],
+                        effect = skills[basic_info["activeskill"]]["effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("activeskillcopilot", "").lower())
+                    ),
+                    PilotSkill(
+                        name = skills[basic_info["passiveskill1"]]["name"],
+                        effect = skills[basic_info["passiveskill1"]]["effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill1copilot", "").lower())
+                    ),
+                    PilotSkill(
+                        name = skills[basic_info["passiveskill2"]]["name"],
+                        effect = skills[basic_info["passiveskill2"]]["effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill2copilot", "").lower())
+                    ),
+                    PilotSkill(
+                        name = skills[basic_info["passiveskill3"]]["name"],
+                        effect = skills[basic_info["passiveskill3"]]["effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill3copilot", "").lower())
+                    )
                 ),
-                PilotSkill(
-                    name = basic_info["passiveskill2name"],
-                    effect = basic_info["passiveskill2effect"],
-                    copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill2type", "").lower())
+                awaken_skills = (
+                    PilotSkill(
+                        name = skills[basic_info["awakenactiveskill"]]["name"],
+                        effect = skills[basic_info["awakenactiveskill"]]["effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("awakenactiveskillcopilot", "").lower())
+                    ),
+                    PilotSkill(
+                        name = skills[basic_info["awakenpassiveskill1"]]["name"],
+                        effect = skills[basic_info["awakenpassiveskill1"]]["effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("awakenpassiveskill1copilot", "").lower())
+                    ),
+                    PilotSkill(
+                        name = skills[basic_info["awakenpassiveskill2"]]["name"],
+                        effect = skills[basic_info["awakenpassiveskill2"]]["effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("awakenpassiveskill2copilot", "").lower())
+                    ),
+                    PilotSkill(
+                        name = skills[basic_info["awakenpassiveskill3"]]["name"],
+                        effect = skills[basic_info["awakenpassiveskill3"]]["effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("awakenpassiveskill3copilot", "").lower())
+                    )
+                ) if "awakenactiveskill" in basic_info else (),
+                copilot_slots = PilotCopilotSlots(
+                    Attack = bool(basic_info.get("copilotattack")),
+                    Tech = bool(basic_info.get("copilottech")),
+                    Defense = bool(basic_info.get("copilotdefense")),
+                    Support = bool(basic_info.get("copilotsupport")),
+                    Control = bool(basic_info.get("copilotcontrol")),
+                    Special = bool(basic_info.get("copilotspecial"))
                 ),
-                PilotSkill(
-                    name = basic_info["passiveskill3name"],
-                    effect = basic_info["passiveskill3effect"],
-                    copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill3type", "").lower())
-                )
-            ),
-            copilot_slots = PilotCopilotSlots(
-                Attack = bool(basic_info.get("copilotattack")),
-                Tech = bool(basic_info.get("copilottech")),
-                Defense = bool(basic_info.get("copilotdefense")),
-                Support = bool(basic_info.get("copilotsupport")),
-                Control = bool(basic_info.get("copilotcontrol")),
-                Special = bool(basic_info.get("copilotspecial"))
-            ),
-            skins = list(skins.values())
-        )
+                skins = list(skins.values())
+            )
+        else:
+            pilot = Pilot(
+                index = page_id,
+                en_name = basic_info["name (english/romaji)"],
+                jp_name = basic_info["name (original)"],
+                page_name = raw["parse"]["title"],
+                description = basic_info.get("background"),
+                personality = basic_info["personality"],
+                faction = basic_info["affiliation"],
+                artist = basic_info.get("artist"),
+                voice_actor = basic_info.get("seiyuu"),
+                stats = PilotStats.estimated_from_stats(
+                    ranged = utils.to_int(basic_info["shootingmax"]),
+                    melee = utils.to_int(basic_info["meleemax"]),
+                    defense = utils.to_int(basic_info["defensemax"]),
+                    reaction = utils.to_int(basic_info["reactionmax"])
+                ),
+                skills = (
+                    PilotSkill(
+                        name = basic_info["activeskillname"],
+                        effect = basic_info["activeskilleffect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("activeskilltype", "").lower())
+                    ),
+                    PilotSkill(
+                        name = basic_info["passiveskill1name"],
+                        effect = basic_info["passiveskill1effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill1type", "").lower())
+                    ),
+                    PilotSkill(
+                        name = basic_info["passiveskill2name"],
+                        effect = basic_info["passiveskill2effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill2type", "").lower())
+                    ),
+                    PilotSkill(
+                        name = basic_info["passiveskill3name"],
+                        effect = basic_info["passiveskill3effect"],
+                        copilot = COPILOT_SLOTS.get(basic_info.get("passiveskill3type", "").lower())
+                    )
+                ),
+                copilot_slots = PilotCopilotSlots(
+                    Attack = bool(basic_info.get("copilotattack")),
+                    Tech = bool(basic_info.get("copilottech")),
+                    Defense = bool(basic_info.get("copilotdefense")),
+                    Support = bool(basic_info.get("copilotsupport")),
+                    Control = bool(basic_info.get("copilotcontrol")),
+                    Special = bool(basic_info.get("copilotspecial"))
+                ),
+                skins = list(skins.values())
+            )
 
         return pilot
 
