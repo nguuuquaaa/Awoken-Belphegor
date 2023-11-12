@@ -192,7 +192,7 @@ class Pilot(BaseModel):
     personality: PilotPersonality
     copilot_slots: PilotCopilotSlots
     skills: tuple[PilotSkill, PilotSkill, PilotSkill, PilotSkill]
-    awaken_skills: tuple[()] | tuple[PilotSkill, PilotSkill, PilotSkill, PilotSkill]
+    awaken_skills: tuple[()] | tuple[PilotSkill, PilotSkill, PilotSkill, PilotSkill] = ()
     artist: str | None
     voice_actor: str | None
     description: str | None
