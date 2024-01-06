@@ -733,8 +733,7 @@ class IronSaga(commands.Cog):
             names = []
             for row in data[0]:
                 if len(row) > 1:
-                    value = row[1].rpartition("<br>")[2].strip()
-                    ret = parser.parse(value)
+                    ret = parser.parse(row[0])
                     names.append(ret)
         else:
             names = [n.strip() for n in name.split(";")]
