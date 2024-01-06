@@ -10,6 +10,7 @@ from functools import partial
 import time
 import traceback
 import math
+import re
 
 from belphegor import errors, utils
 from belphegor.settings import settings
@@ -32,6 +33,8 @@ ISWIKI_API = f"{ISWIKI_BASE}/api.php"
 #=============================================================================================================================#
 
 skills = {}
+skill_section_regex = re.compile(r"""\<section begin\="(\w+)_(name|effect)" \/\>(.+)\<section.+""", re.DOTALL)
+
 parser = wiki.WikitextParser()
 
 @parser.set_box_handler("PilotInfo")
@@ -694,19 +697,26 @@ class IronSaga(commands.Cog):
     async def update_pilot(self, interaction: Interaction, name: typing.Optional[str] = None):
         await interaction.response.defer(thinking = True)
 
-        # skills.json
+        # fetch all skills
         resp = await self.bot.session.get(
             ISWIKI_API,
             params = {
                 "action":       "parse",
                 "prop":         "wikitext",
-                "page":         "Template:Skills.json",
+                "page":         "Skill_List",
                 "format":       "json",
                 "redirects":    1
             }
         )
         raw = json.loads(await resp.content.read())
-        skills.update(json.loads(raw["parse"]["wikitext"]["*"]))
+        data = parser.parse(raw["parse"]["wikitext"]["*"])
+        for row in data[0][1:]:
+            m0 = skill_section_regex.match(row[0])
+            m2 = skill_section_regex.match(row[2])
+            skills[m0.group(1)] = {
+                "name": m0.group(3),
+                "effect": m2.group(3)
+            }
 
         # pilot parsing
         if name is None:

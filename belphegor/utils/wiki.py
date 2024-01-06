@@ -204,15 +204,16 @@ class WikitextParser:
         # end header
 
         ret = []
-        row = [""]
+        row = []
         for raw in table[1:]:
             if raw.startswith("!"):
-                l, _, r = raw[1:].partition("|")
-                t = r or l
-                row[0] = t.strip()
-            elif raw.startswith("|-"):
-                ret.append(row)
-                row = [""]
+                l, _, r = raw.partition("|")
+                raw = "|" + r.strip()
+
+            if raw.startswith("|-"):
+                if row:
+                    ret.append(row)
+                    row = []
             elif raw.startswith("|"):
                 ext = []
                 for c in raw[1:].split("||"):
@@ -221,9 +222,13 @@ class WikitextParser:
                     ext.append(t.strip())
                 row.extend(ext)
             else:
-                row[-1] = f"{row[-1]}\n{raw}".strip()
-        if len(row) > 1:
-            ret.append(row)
+                if row:
+                    row[-1] = f"{row[-1]}\n{raw}".strip()
+                else:
+                    row.append(raw)
+        else:
+            if row:
+                ret.append(row)
 
         class_ = header.get("class")
         return self.table_parsers.get(class_, self.table_do_nothing)(class_, ret)
