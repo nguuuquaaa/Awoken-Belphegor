@@ -731,7 +731,7 @@ class IronSaga(commands.Cog):
             raw = json.loads(await resp.content.read())
             data = parser.parse(raw["parse"]["wikitext"]["*"])
             names = []
-            for row in data[0]:
+            for row in data[0][1:]:
                 if len(row) > 1:
                     ret = parser.parse(row[0])
                     names.append(ret)
