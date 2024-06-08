@@ -96,6 +96,37 @@ class Calculator(paginators.ContinuousInput):
 
 #=============================================================================================================================#
 
+class SauceSelectMenu(paginators.PaginatorSelect):
+    paginator: "SauceSelector"
+
+    async def callback(self, interaction: Interaction):
+        paginator = self.paginator
+        url = paginator.images[self.values[0]]
+        paginator.stop()
+        paginator.view = None
+        await paginator.request_sauce(interaction, url)
+
+class SauceSelector(paginators.SingleRowPaginator):
+    images: dict[str, str]
+
+    select_menu: SauceSelectMenu
+
+    @classmethod
+    def from_images(cls, images: list[tuple[str, str]]):
+        paginator = cls([paginators.PageItem(value = name) for name, url in images], selectable = True)
+        paginator.images = {name: url for name, url in images}
+        return paginator
+
+    def render_embed(self):
+        embed = super().render_embed()
+        embed.title = f"Select image to search for sauce:"
+        return embed
+
+    async def request_sauce(self, interaction: Interaction, url: str):
+        pass
+
+#=============================================================================================================================#
+
 class SaucenaoConfirmed(paginators.ConfirmedButton):
     paginator: "SaucenaoHiddenResults"
 
@@ -126,8 +157,14 @@ class Misc(commands.Cog):
     def __init__(self, bot: "Belphegor"):
         self.bot = bot
 
+        self.saucenao_ctx_menu = ac.ContextMenu(
+            name = 'Sauce?',
+            callback = self.saucenao_context,
+        )
+        self.bot.tree.add_command(self.saucenao_ctx_menu)
+
     async def cog_unload(self):
-        await asyncio.get_running_loop().run_in_executor(self.pool.shutdown(wait = True, cancel_futures = False))
+        self.bot.tree.remove_command(self.saucenao_ctx_menu.name, type = self.saucenao_ctx_menu.type)
 
     @ac.command(name = "eca")
     @ac.describe(rule_number = "Rule number")
@@ -195,16 +232,11 @@ class Misc(commands.Cog):
         calc = Calculator()
         await calc.initialize(interaction)
 
-    @ac.command(name = "saucenao", description = "Find the sauce of the image.")
-    async def saucenao(
-        self,
-        interaction: Interaction,
-        url: ac.Transform[URL, transformers.URLTransformer]
-    ):
+    async def request_sauce(self, interaction: Interaction, url: str):
         await interaction.response.defer(thinking = True)
         payload = aiohttp.FormData()
         payload.add_field("file", b"", filename = "", content_type = "application/octet-stream")
-        payload.add_field("url", str(url))
+        payload.add_field("url", url)
         payload.add_field("frame", "1")
         payload.add_field("hide", "0")
         payload.add_field("database", "999")
@@ -239,9 +271,11 @@ class Misc(commands.Cog):
             if not content_url:
                 content_url = content.find("div", class_ = "resultmiscinfo").find("a")
             if content_url:
-                r = {"title": title, "similarity": similarity, "url": content_url["href"]}
+                # r = {"title": title, "similarity": similarity, "url": content_url["href"]}
+                r = f"[{title} ({similarity})]({content_url['href']})"
             else:
-                r = {"title": title, "similarity": similarity, "url": ""}
+                # r = {"title": title, "similarity": similarity, "url": ""}
+                r = f"{title} ({similarity})"
             if "hidden" in tag["class"]:
                 hidden_results.append(r)
             else:
@@ -250,7 +284,7 @@ class Misc(commands.Cog):
         if results:
             embed = discord.Embed(
                 title = "Sauce found?",
-                description = "\n".join((f"[{r['title']} ({r['similarity']})]({r['url']})" for r in results))
+                description = "\n".join(results)
             )
             embed.set_footer(text = "Powered by https://saucenao.com")
             await interaction.followup.send(embed = embed)
@@ -258,13 +292,45 @@ class Misc(commands.Cog):
             if hidden_results:
                 embed = discord.Embed(
                     title = "Sauce found?",
-                    description = "\n".join((f"[{r['title']} ({r['similarity']})]({r['url']})" for r in hidden_results))
+                    description = "\n".join(hidden_results)
                 )
                 embed.set_footer(text = "Powered by https://saucenao.com")
                 yes_no = SaucenaoHiddenResults(embed)
                 await yes_no.initialize(interaction)
             else:
                 await interaction.followup.send("No result found.")
+
+    @ac.command(name = "saucenao", description = "Find the sauce of the image.")
+    async def saucenao(
+        self,
+        interaction: Interaction,
+        url: ac.Transform[URL, transformers.URLTransformer]
+    ):
+        await self.request_sauce(interaction, str(url))
+
+    async def saucenao_context(
+        self,
+        interaction: Interaction,
+        message: discord.Message
+    ):
+        targets = []
+        for i, attachment in enumerate(message.attachments):
+            targets.append((f"Attachment {i + 1}", attachment.proxy_url))
+        for i, embed in enumerate(message.embeds):
+            if embed.image.proxy_url:
+                targets.append((f"Image {i + 1}", embed.image.proxy_url))
+            if embed.thumbnail.proxy_url:
+                targets.append((f"Thumbnail {i + 1}", embed.thumbnail.proxy_url))
+
+        if targets:
+            if len(targets) > 1:
+                sauce_paging = SauceSelector.from_images(targets)
+                sauce_paging.request_sauce = self.request_sauce
+                await sauce_paging.initialize(interaction)
+            else:
+                await self.request_sauce(interaction, targets[0][1])
+        else:
+            await interaction.response.send_message("This message doesn't have any attachment.")
 
 #=============================================================================================================================#
 
