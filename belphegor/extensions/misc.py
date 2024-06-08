@@ -11,7 +11,7 @@ import typing
 
 from belphegor import utils
 from belphegor.settings import settings
-from belphegor.templates import ui_ex, paginators
+from belphegor.templates import ui_ex, paginators, transformers
 from belphegor.templates.discord_types import Interaction
 from .misc_core import calculator
 
@@ -194,6 +194,77 @@ class Misc(commands.Cog):
 
         calc = Calculator()
         await calc.initialize(interaction)
+
+    @ac.command(name = "saucenao", description = "Find the sauce of the image.")
+    async def saucenao(
+        self,
+        interaction: Interaction,
+        url: ac.Transform[URL, transformers.URLTransformer]
+    ):
+        await interaction.response.defer(thinking = True)
+        payload = aiohttp.FormData()
+        payload.add_field("file", b"", filename = "", content_type = "application/octet-stream")
+        payload.add_field("url", str(url))
+        payload.add_field("frame", "1")
+        payload.add_field("hide", "0")
+        payload.add_field("database", "999")
+        async with self.bot.session.post(
+            "https://saucenao.com/search.php",
+            headers = {
+                "User-Agent": settings.USER_AGENT
+            },
+            data = payload
+        ) as response:
+            bytes_ = await response.read()
+        data = BS(bytes_.decode("utf-8"), "lxml")
+        results = []
+        hidden_results = []
+        for tag in data.find_all(lambda x: x.name == "div" and x.get("class") in [["result"], ["result", "hidden"]] and not x.get("id")):
+            content = tag.find("td", class_ = "resulttablecontent")
+            title_tag = content.find("div", class_ = "resulttitle")
+            if title_tag:
+                for br in title_tag.find_all("br"):
+                    br.replace_with("\n")
+                try:
+                    title = title_tag.get_text().strip().splitlines()[0]
+                except IndexError:
+                    title = "no title"
+            else:
+                result_content = tag.find("div", class_ = "resultcontent")
+                for br in result_content.find_all("br"):
+                    br.replace_with("\n")
+                title = utils.get_element(result_content.get_text().strip().splitlines(), 0, default = "No title")
+            similarity = content.find("div", class_ = "resultsimilarityinfo").text
+            content_url = content.find("a", class_ = "linkify")
+            if not content_url:
+                content_url = content.find("div", class_ = "resultmiscinfo").find("a")
+            if content_url:
+                r = {"title": title, "similarity": similarity, "url": content_url["href"]}
+            else:
+                r = {"title": title, "similarity": similarity, "url": ""}
+            if "hidden" in tag["class"]:
+                hidden_results.append(r)
+            else:
+                results.append(r)
+
+        if results:
+            embed = discord.Embed(
+                title = "Sauce found?",
+                description = "\n".join((f"[{r['title']} ({r['similarity']})]({r['url']})" for r in results))
+            )
+            embed.set_footer(text = "Powered by https://saucenao.com")
+            await interaction.followup.send(embed = embed)
+        else:
+            if hidden_results:
+                embed = discord.Embed(
+                    title = "Sauce found?",
+                    description = "\n".join((f"[{r['title']} ({r['similarity']})]({r['url']})" for r in hidden_results))
+                )
+                embed.set_footer(text = "Powered by https://saucenao.com")
+                yes_no = SaucenaoHiddenResults(embed)
+                await yes_no.initialize(interaction)
+            else:
+                await interaction.followup.send("No result found.")
 
 #=============================================================================================================================#
 
