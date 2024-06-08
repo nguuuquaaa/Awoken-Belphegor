@@ -1,12 +1,15 @@
 from discord import ui
 import typing
+from typing_extensions import TypeVar
+from collections.abc import Callable, Awaitable
 
-from . import views
+from . import discord_types, views
 from .metas import BaseItem
 
 #=============================================================================================================================#
 
-_V = typing.TypeVar("_V", bound = views.StandardView)
+_V = TypeVar("_V", bound = views.View, default = views.View)
 
 class Item(BaseItem, ui.Item[_V]):
-    pass
+    def __call__(self, func: Callable[[discord_types.Interaction], Awaitable]):
+        self.callback = func

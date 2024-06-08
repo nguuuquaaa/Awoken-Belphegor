@@ -23,12 +23,12 @@ class InputModal(Modal):
     input_text_box: text_inputs.InputTextBox
 
     def create_text_box(self) -> text_inputs.InputTextBox:
-        text_box = utils.get_default_attribute(self, "input_text_box")
-        return text_box
+        self.input_text_box = utils.get_default_attribute(self, "input_text_box")
+        return self.input_text_box
 
     def __post_init__(self):
-        self.input_text_box = self.create_text_box()
-        self.add_item(self.input_text_box)
+        input_text_box = self.create_text_box()
+        self.add_item(input_text_box)
 
 class JumpToModal(InputModal):
     title: str = "Jump"

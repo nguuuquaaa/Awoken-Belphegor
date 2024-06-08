@@ -2,14 +2,15 @@ import discord
 from discord import ui
 import typing
 import abc
+from typing_extensions import TypeVar
 
 from belphegor import utils
+from belphegor.templates.discord_types import Interaction
 from . import views, items, modals
-from ..discord_types import Interaction
 
 #=============================================================================================================================#
 
-_V = typing.TypeVar("_V", bound = views.StandardView)
+_V = TypeVar("_V", bound = views.View, default = views.View)
 
 EmojiType: typing.TypeAlias = str | discord.Emoji | discord.PartialEmoji
 
@@ -52,8 +53,8 @@ class InputButton(BlueButton[_V]):
     input_modal: modals.InputModal
 
     def create_modal(self) -> modals.InputModal:
-        modal = utils.get_default_attribute(self, "input_modal")
-        return modal
+        self.input_modal = utils.get_default_attribute(self, "input_modal")
+        return self.input_modal
 
     async def callback(self, interaction: Interaction):
         modal = self.create_modal()

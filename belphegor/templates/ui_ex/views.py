@@ -6,12 +6,12 @@ from .metas import PostInitable
 from ..discord_types import Interaction
 
 if typing.TYPE_CHECKING:
-    from ..panels import Panel
+    from ..panels import ControlPanel
 
 #=============================================================================================================================#
 
-class StandardView(PostInitable, ui.View):
-    panel: "Panel"
+class View(PostInitable, ui.View):
+    panel: "ControlPanel"
     allowed_user: discord.User
 
     def __init__(self, *, timeout: int | float = 180.0, allowed_user: discord.User = None):
