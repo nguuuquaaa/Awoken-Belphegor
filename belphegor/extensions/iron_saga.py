@@ -6,7 +6,6 @@ import typing
 from collections.abc import Callable
 from urllib.parse import quote
 import json
-from functools import partial
 import time
 import traceback
 import math
@@ -291,8 +290,8 @@ class PilotSelectMenu(paginators.PaginatorSelect):
     async def callback(self, interaction: Interaction):
         pilot = self.paginator.pilots[self.values[0]]
         new_paginator = PilotDisplay(pilot)
-        new_paginator.panel.target_message = self.paginator.panel.target_message
-        self.paginator.panel.stop()
+        new_paginator.target_message = self.paginator.target_message
+        self.paginator.stop()
         await new_paginator.initialize(interaction)
 
 class PilotSelector(paginators.SingleRowPaginator):
@@ -320,7 +319,7 @@ class PilotStatsButton(ui_ex.StatsButton):
 
     async def callback(self, interaction: Interaction):
         paginator = self.paginator
-        paginator.panel.embed = paginator.pilot.stats_embed()
+        paginator.edit_blueprint(embed = paginator.pilot.stats_embed())
         await paginator.update(interaction)
 
 class PilotAwakenStatsButton(ui_ex.StatsButton):
@@ -331,7 +330,7 @@ class PilotAwakenStatsButton(ui_ex.StatsButton):
 
     async def callback(self, interaction: Interaction):
         paginator = self.paginator
-        paginator.panel.embed = paginator.pilot.awaken_stats_embed()
+        paginator.edit_blueprint(embed = paginator.pilot.awaken_stats_embed())
         await paginator.update(interaction)
 
 class PilotTriviaButton(ui_ex.TriviaButton):
@@ -339,7 +338,7 @@ class PilotTriviaButton(ui_ex.TriviaButton):
 
     async def callback(self, interaction: Interaction):
         paginator = self.paginator
-        paginator.panel.embed = paginator.pilot.trivia_embed()
+        paginator.edit_blueprint(embed = paginator.pilot.trivia_embed())
         await paginator.update(interaction)
 
 class PilotSkinsButton(ui_ex.SkinsButton):
@@ -379,7 +378,7 @@ class PilotDisplay(paginators.BasePaginator):
         self.pilot = pilot
         self.skins = utils.CircleIter([utils.CircleIter(s, start_index = 0) for s in utils.grouper(pilot.skins, self.SKIN_SELECT_SIZE, incomplete = "missing")], start_index = -1)
 
-        view = ui_ex.StandardView()
+        view = self.view = ui_ex.View()
         view.add_item(self.get_paginator_attribute("stats_button", row = 1))
         if pilot.awaken_skills:
             view.add_item(self.get_paginator_attribute("awaken_button", row = 1))
@@ -387,14 +386,13 @@ class PilotDisplay(paginators.BasePaginator):
         if len(self.skins) > 1:
             view.add_item(self.get_paginator_attribute("skin_button", row = 1, label = f"Skins (1 / {len(self.skins)})"))
         view.add_exit_button(row = 2)
-        self.panel.view = view
 
         self.show_next_skin_set()
-        self.panel.embed = pilot.stats_embed()
+        self.edit_blueprint(embed = pilot.stats_embed())
 
     def show_next_skin_set(self):
         if getattr(self, "skin_select", None):
-            self.panel.view.remove_item(self.skin_select)
+            self.view.remove_item(self.skin_select)
 
         next(self.skins)
         set_index, batch = self.skins.current(True)
@@ -406,13 +404,13 @@ class PilotDisplay(paginators.BasePaginator):
                 value = str(i)
             )
         self.skin_select = skin_select
-        self.panel.view.add_item(skin_select)
+        self.view.add_item(skin_select)
 
     def render(self):
         skin = self.skins.current().current()
         self.skin_select.placeholder = skin.name
-        self.panel.embed.set_image(url = skin.url)
-        return self.panel
+        self.blueprint.embed.set_image(url = skin.url)
+        return self
 
 #=============================================================================================================================#
 
@@ -472,12 +470,12 @@ class PartSelectMenu(paginators.PaginatorSelect):
             )
 
     async def callback(self, interaction: Interaction):
+        paginator = self.paginator
         part = self.paginator.parts[self.values[0]]
-        panel = self.paginator.panel
-        panel.stop()
-        panel.view = None
-        panel.embed = part.display()
-        await panel.reply(interaction)
+        paginator.stop()
+        paginator.view = None
+        paginator.edit_blueprint(embed = part.display())
+        await paginator.reply(interaction)
 
 class PartEmbedTemplate(paginators.PaginatorEmbedTemplate):
     description: Callable[[paginators.PageItem, int], str] = lambda item, index: f"{index + 1}. [{item.value.rank}] {item.value.name}"
@@ -522,12 +520,12 @@ class PetSelectMenu(paginators.PaginatorSelect):
     paginator: "PetSelector"
 
     async def callback(self, interaction: Interaction):
+        paginator = self.paginator
         pet = self.paginator.pets[self.values[0]]
-        panel = self.paginator.panel
-        panel.stop()
-        panel.view = None
-        panel.embed = pet.display()
-        await panel.reply(interaction)
+        paginator.stop()
+        paginator.view = None
+        paginator.edit_blueprint(embed = pet.display())
+        await paginator.reply(interaction)
 
 class PetSelector(paginators.SingleRowPaginator):
     pets: dict[str, Pet]

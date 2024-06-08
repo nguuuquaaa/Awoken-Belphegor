@@ -116,8 +116,8 @@ class Daemon(BaseModel):
                     )
 
         data_embed.set_image(url = paginator.images.current())
-        paginator.panel.embed = data_embed
-        return paginator.panel
+        paginator.edit_blueprint(embed = data_embed)
+        return paginator
 
     def display_trivia(self, paginator: "DaemonDisplay"):
         description = self.description or "--"
@@ -144,19 +144,18 @@ class Daemon(BaseModel):
         )
 
         data_embed.set_image(url = paginator.images.current())
-        paginator.panel.embed = data_embed
-        return paginator.panel
+        paginator.edit_blueprint(embed = data_embed)
+        return paginator
 
 #=============================================================================================================================#
 
 class DaemonSelectMenu(paginators.PaginatorSelect):
-    paginator: "DaemonSelector"
-
     async def callback(self, interaction: Interaction):
-        daemon = self.paginator.daemons[self.values[0]]
+        old_paginator: DaemonSelector = self.view.panel
+        daemon = old_paginator.daemons[self.values[0]]
         new_paginator = DaemonDisplay(daemon)
-        new_paginator.panel.target_message = self.paginator.panel.target_message
-        self.paginator.panel.stop()
+        new_paginator.target_message = old_paginator.target_message
+        old_paginator.stop()
         await new_paginator.initialize(interaction)
 
 class DaemonSelector(paginators.SingleRowPaginator):
@@ -170,8 +169,8 @@ class DaemonSelector(paginators.SingleRowPaginator):
         paginator.daemons = {d.name: d for d in daemons}
         return paginator
 
-    def create_embed(self):
-        embed = super().create_embed()
+    def render_embed(self):
+        embed = super().render_embed()
         embed.title = f"Found {len(self.daemons)} daemons"
         return embed
 
@@ -219,12 +218,11 @@ class DaemonDisplay(paginators.BasePaginator):
         self.images = utils.CircleIter([p for p in [daemon.pic_url, daemon.artwork_url] if p], start_index = 0)
         self.render = functools.partial(daemon.display_stats, self)
 
-        view = ui_ex.StandardView()
+        view = self.view = ui_ex.View()
         view.add_item(self.get_paginator_attribute("stats_button", row = 0))
         view.add_item(self.get_paginator_attribute("trivia_button", row = 0))
         view.add_item(self.get_paginator_attribute("image_button", row = 0))
         view.add_exit_button(row = 1)
-        self.panel.view = view
 
 #=============================================================================================================================#
 
@@ -256,8 +254,7 @@ class SummonButton(ui_ex.Button):
         embed.set_image(url = d["pic_url"])
         embed.set_footer(text = f"Total: {paginator.total_summons} summons")
 
-        paginator.panel.embed = embed
-        paginator.panel.embeds = discord.utils.MISSING
+        paginator.edit_blueprint(embed = embed, embeds = None)
         await paginator.update(interaction)
 
 class Summon10Button(ui_ex.Button):
@@ -297,8 +294,7 @@ class Summon10Button(ui_ex.Button):
             embed.set_image(url = d["pic_url"])
             embeds.append(embed)
 
-        paginator.panel.embed = discord.utils.MISSING
-        paginator.panel.embeds = embeds
+        paginator.edit_blueprint(embed = None, embeds = embeds)
         await paginator.update(interaction)
 
 class ContinuousSummon(paginators.BasePaginator):
@@ -315,14 +311,13 @@ class ContinuousSummon(paginators.BasePaginator):
         return paginator
 
     def render(self):
-        if not self.panel.view:
-            view = ui_ex.StandardView()
+        if not self.view:
+            view = self.view = ui_ex.View()
             self.summon_button = self.get_paginator_attribute("summon_button")
             view.add_item(self.summon_button)
             view.add_exit_button()
-            self.panel.view = view
 
-        return self.panel
+        return self
 
     async def initialize(self, interaction: Interaction):
         panel = self.render()

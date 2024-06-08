@@ -13,10 +13,9 @@ log = utils.get_logger()
 
 #=============================================================================================================================#
 
-class Panel:
-    """A panel is a self-contained pair of message and view that listens and responses to itself."""
+class Blueprint:
+    "A blueprint contains all static elements of a to-be-sended message."
 
-    target_message: discord.Message = None
     content: typing.Any = MISSING
     embed: discord.Embed = MISSING
     embeds: Sequence[discord.Embed] = MISSING
@@ -26,16 +25,6 @@ class Panel:
     ephemeral: bool = False
     allowed_mentions: discord.AllowedMentions = MISSING
 
-    @property
-    def view(self) -> ui_ex.StandardView:
-        return self._view
-
-    @view.setter
-    def view(self, value: ui_ex.StandardView):
-        if value:
-            value.panel = self
-        self._view = value
-
     def __init__(self,
         content: typing.Any = MISSING,
         *,
@@ -43,72 +32,192 @@ class Panel:
         embeds: Sequence[discord.Embed] = MISSING,
         file: discord.File = MISSING,
         files: Sequence[discord.File] = MISSING,
-        view: ui_ex.StandardView = MISSING,
         tts: bool = False,
         ephemeral: bool = False,
         allowed_mentions: discord.AllowedMentions = MISSING
     ):
-        self.target_message = None
         self.content = content
         self.embed = embed
         self.embeds = embeds
         self.file = file
         self.files = files
-        self.view = view
         self.tts = tts
         self.ephemeral = ephemeral
         self.allowed_mentions = allowed_mentions
 
+    def merge(self, blueprint: "Blueprint"):
+        """Update self with non-missing attributes of the target blueprint."""
+
+        self.tts = blueprint.tts
+        self.ephemeral = blueprint.ephemeral
+        for key in ("content", "embed", "embeds", "file", "files", "allowed_mentions"):
+            value = getattr(blueprint, key)
+            if value is not MISSING:
+                setattr(self, key, value)
+
+        return self
+
+    def update(
+        self,
+        *,
+        content: typing.Any = MISSING,
+        embed: discord.Embed = MISSING,
+        embeds: Sequence[discord.Embed] = MISSING,
+        file: discord.File = MISSING,
+        files: Sequence[discord.File] = MISSING,
+        tts: bool = MISSING,
+        ephemeral: bool = MISSING,
+        allowed_mentions: discord.AllowedMentions = MISSING
+    ):
+        """Update multiple attributes."""
+
+        for key, value in (
+            ("content", content),
+            ("embed", embed),
+            ("embeds", embeds),
+            ("file", file),
+            ("files", files),
+            ("tts", tts),
+            ("ephemeral", ephemeral),
+            ("allowed_mentions", allowed_mentions)
+        ):
+            if value is None:
+                setattr(self, key, MISSING)
+            elif value is not MISSING:
+                setattr(self, key, value)
+
+        return self
+
+#=============================================================================================================================#
+
+class ControlPanel:
+    """A control panel is a representation of the "reaction chain" that a slash command sends and listens to, but specifically contained in a single message."""
+
+    target_message: discord.Message = None
+
+    @property
+    def blueprint(self) -> Blueprint:
+        return self._blueprint
+
+    @blueprint.setter
+    def blueprint(self, value: Blueprint):
+        self._blueprint = value
+
+    @property
+    def view(self) -> ui_ex.View | None:
+        return self._view
+
+    @view.setter
+    def view(self, value: ui_ex.View | None):
+        if value is not None:
+            value.panel = self
+        self._view = value
+
+    def __init__(self):
+        self.target_message = None
+        self.blueprint = Blueprint()
+        self.view = None
+
+    def edit_blueprint(
+        self,
+        *,
+        content: typing.Any = MISSING,
+        embed: discord.Embed = MISSING,
+        embeds: Sequence[discord.Embed] = MISSING,
+        file: discord.File = MISSING,
+        files: Sequence[discord.File] = MISSING,
+        tts: bool = MISSING,
+        ephemeral: bool = MISSING,
+        allowed_mentions: discord.AllowedMentions = MISSING
+    ):
+        self.blueprint.update(
+            content = content,
+            embed = embed,
+            embeds = embeds,
+            file = file,
+            files = files,
+            tts = tts,
+            ephemeral = ephemeral,
+            allowed_mentions = allowed_mentions
+        )
+        return self
+
+    @classmethod
+    def from_parts(
+        cls,
+        *,
+        content: typing.Any = MISSING,
+        embed: discord.Embed = MISSING,
+        embeds: Sequence[discord.Embed] = MISSING,
+        file: discord.File = MISSING,
+        files: Sequence[discord.File] = MISSING,
+        tts: bool = MISSING,
+        ephemeral: bool = MISSING,
+        allowed_mentions: discord.AllowedMentions = MISSING
+    ):
+        obj = cls()
+        obj.edit_blueprint(
+            content = content,
+            embed = embed,
+            embeds = embeds,
+            file = file,
+            files = files,
+            tts = tts,
+            ephemeral = ephemeral,
+            allowed_mentions = allowed_mentions
+        )
+        return obj
+
     async def reply(self, interaction: Interaction):
-        """
-        Reply to an interaction.
-        """
+        """Reply to an interaction."""
+
+        blueprint = self.blueprint
+        view = self.view
         match interaction.response.is_done(), self.target_message:
             case True, None:
                 self.target_message = await interaction.followup.send(
-                    self.content,
-                    embed = self.embed,
-                    embeds = self.embeds,
-                    file = self.file,
-                    files = self.files,
-                    view = self.view,
-                    tts = self.tts,
-                    ephemeral = self.ephemeral,
-                    allowed_mentions = self.allowed_mentions,
+                    blueprint.content,
+                    embed = blueprint.embed,
+                    embeds = blueprint.embeds,
+                    file = blueprint.file,
+                    files = blueprint.files,
+                    tts = blueprint.tts,
+                    ephemeral = blueprint.ephemeral,
+                    allowed_mentions = blueprint.allowed_mentions,
+                    view = view or MISSING,
                     wait = True
                 )
 
-            case True, _:
-                msg = self.target_message = interaction.message
+            case True, msg:
                 await msg.edit(
-                    content = self.content or None,
-                    embeds = self.embeds if self.embeds else [self.embed] if self.embed else [],
-                    attachments = self.files if self.files else [self.file] if self.file else [],
-                    view = self.view,
-                    allowed_mentions = self.allowed_mentions or None
+                    content = blueprint.content or None,
+                    embeds = blueprint.embeds if blueprint.embeds else [blueprint.embed] if blueprint.embed else [],
+                    attachments = blueprint.files if blueprint.files else [blueprint.file] if blueprint.file else [],
+                    allowed_mentions = blueprint.allowed_mentions or None,
+                    view = view
                 )
 
             case False, None:
                 await interaction.response.send_message(
-                    self.content,
-                    embed = self.embed,
-                    embeds = self.embeds,
-                    file = self.file,
-                    files = self.files,
-                    view = self.view,
-                    tts = self.tts,
-                    ephemeral = self.ephemeral,
-                    allowed_mentions = self.allowed_mentions
+                    blueprint.content,
+                    embed = blueprint.embed,
+                    embeds = blueprint.embeds,
+                    file = blueprint.file,
+                    files = blueprint.files,
+                    tts = blueprint.tts,
+                    ephemeral = blueprint.ephemeral,
+                    allowed_mentions = blueprint.allowed_mentions,
+                    view = view or MISSING
                 )
                 self.target_message = await interaction.original_response()
 
             case False, _:
                 await interaction.response.edit_message(
-                    content = self.content or None,
-                    embeds = self.embeds if self.embeds else [self.embed] if self.embed else [],
-                    attachments = self.files if self.files else [self.file] if self.file else [],
-                    view = self.view,
-                    allowed_mentions = self.allowed_mentions or None
+                    content = blueprint.content or None,
+                    embeds = blueprint.embeds if blueprint.embeds else [blueprint.embed] if blueprint.embed else [],
+                    attachments = blueprint.files if blueprint.files else [blueprint.file] if blueprint.file else [],
+                    allowed_mentions = blueprint.allowed_mentions or None,
+                    view = view
                 )
 
     async def thinking(self, interaction: Interaction):
@@ -130,24 +239,18 @@ class Panel:
             case False, _:
                 await interaction.response.edit_message(content = thinking_msg, embeds = [], attachments = [])
 
-    async def defer(self, interaction: Interaction):
+    async def defer(self, interaction: Interaction, *, ephemeral: bool = MISSING):
+        if ephemeral is MISSING:
+            ephemeral = self.blueprint.ephemeral
+        else:
+            self.blueprint.ephemeral = ephemeral
+
         if interaction.response.is_done():
             pass
         else:
-            await interaction.response.defer(ephemeral = self.ephemeral)
+            await interaction.response.defer(ephemeral = ephemeral)
 
     def stop(self):
         "Stop listening."
         if self.view:
             self.view.stop()
-
-    def update(self, panel: "Panel"):
-        self.target_message =  self.target_message if panel.target_message is None else panel.target_message
-        self.tts = panel.tts
-        self.ephemeral = panel.ephemeral
-        for key in ("content", "embed", "embeds", "file", "files", "allowed_mentions"):
-            value = getattr(panel, key)
-            if value is not MISSING:
-                setattr(self, key, value)
-
-        return self

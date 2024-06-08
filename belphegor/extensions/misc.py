@@ -1,18 +1,22 @@
 import discord
 from discord import app_commands as ac
 from discord.ext import commands
-import typing
 import asyncio
 import numpy as np
 import time
-import io
-from concurrent.futures import ProcessPoolExecutor
+from yarl import URL
+import aiohttp
+from bs4 import BeautifulSoup as BS
+import typing
 
 from belphegor import utils
-from belphegor.bot import Belphegor
+from belphegor.settings import settings
 from belphegor.templates import ui_ex, paginators
 from belphegor.templates.discord_types import Interaction
 from .misc_core import calculator
+
+if typing.TYPE_CHECKING:
+    from belphegor.bot import Belphegor
 
 #=============================================================================================================================#
 
@@ -30,17 +34,17 @@ class MathTextBox(ui_ex.InputTextBox):
     min_length: int = 1
     max_length: int = 1000
 
-class MathInputModal(ui_ex.InputModal):
+class MathInputModal(paginators.ContinuousInputModal):
     paginator: "Calculator"
 
     input_text_box: MathTextBox
 
     async def on_submit(self, interaction: Interaction):
-        panel = self.paginator.panel
+        paginator = self.paginator
         inp = self.input_text_box.value
         parser = self.paginator.parser
 
-        await panel.thinking(interaction)
+        await paginator.thinking(interaction)
         try:
             start = time.perf_counter()
             r = await asyncio.get_running_loop().run_in_executor(None, parser.result, inp)
@@ -73,18 +77,13 @@ class MathInputModal(ui_ex.InputModal):
         e.add_field(name = "Input", value = f"```\n{inp}\n```", inline = False)
         e.add_field(name = "Result", value = msg, inline = False)
 
-        panel.embed = e
-        await panel.reply(interaction)
+        paginator.edit_blueprint(embed = e)
+        await paginator.reply(interaction)
 
 class MathContinuousInputButton(paginators.ContinuousInputButton):
     paginator: "Calculator"
 
     input_modal: MathInputModal
-
-    def create_modal(self) -> MathInputModal:
-        modal = super().create_modal()
-        modal.paginator = self.paginator
-        return modal
 
 class Calculator(paginators.ContinuousInput):
     parser: calculator.MathParse
@@ -95,18 +94,36 @@ class Calculator(paginators.ContinuousInput):
         super().__init__()
         self.parser = calculator.MathParse()
 
+#=============================================================================================================================#
+
+class SaucenaoConfirmed(paginators.ConfirmedButton):
+    paginator: "SaucenaoHiddenResults"
+
+    async def callback(self, interaction: Interaction):
+        self.paginator.edit_blueprint(embed = self.paginator.hidden_results)
+        await self.paginator.update()
+
+class SaucenaoDenied(paginators.DeniedButton):
+    paginator: "SaucenaoHiddenResults"
+
+    async def callback(self, interaction: Interaction):
+        self.view.stop()
+        await interaction.response.edit_message(view = None)
+
+class SaucenaoHiddenResults(paginators.YesNoPrompt):
+    hidden_results: discord.Embed
+
+    def __init__(self, hidden_results: discord.Embed):
+        self.hidden_results = hidden_results
+
     def render(self):
-        if not self.panel.view:
-            view = ui_ex.StandardView()
-            self.continuous_input_button = self.get_paginator_attribute("continuous_input_button")
-            view.add_item(self.continuous_input_button)
-            view.add_exit_button()
-            self.panel.view = view
+        super().render()
+        self.edit_blueprint(content = "No result found.\nDo you want to see low similarity results?")
 
 #=============================================================================================================================#
 
 class Misc(commands.Cog):
-    def __init__(self, bot: Belphegor):
+    def __init__(self, bot: "Belphegor"):
         self.bot = bot
 
     async def cog_unload(self):

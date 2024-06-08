@@ -1,7 +1,6 @@
 import discord
-import typing
-
 from collections.abc import Callable
+
 from .discord_types import Interaction
 
 #=============================================================================================================================#

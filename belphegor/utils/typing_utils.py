@@ -4,6 +4,8 @@ __all__ = [
     "get_default_attribute"
 ]
 
+#=============================================================================================================================#
+
 import typing
 from collections.abc import Callable
 
@@ -13,8 +15,8 @@ _T = typing.TypeVar("_T")
 _R = typing.TypeVar("_R")
 _P = typing.ParamSpec("_P")
 
-def copy_signature(func: Callable[_P, _R]) -> Callable[[Callable], Callable[_P, _R]]:
-    def wrapper(f: Callable):
+def copy_signature(func: Callable[_P, typing.Any]):
+    def wrapper(f: Callable[..., _R]) -> Callable[_P, _R]:
         return f
     return wrapper
 

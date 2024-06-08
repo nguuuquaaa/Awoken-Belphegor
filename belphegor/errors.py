@@ -1,11 +1,18 @@
 
+class FlowControl(Exception):
+    message: str
 
-class CustomError(Exception):
-    def __init__(self, message):
+    def __init__(self, message: str = ""):
         self.message = message
 
-class FlowControl(CustomError):
-    pass
+class CustomError(Exception):
+    message: str
+
+    def __init__(self, message: str = ""):
+        self.message = message
 
 class QueryFailed(CustomError):
+    pass
+
+class InvalidInput(CustomError):
     pass

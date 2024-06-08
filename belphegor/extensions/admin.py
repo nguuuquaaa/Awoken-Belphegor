@@ -16,7 +16,7 @@ from belphegor import utils
 from belphegor.settings import settings
 from belphegor.bot import Belphegor
 from belphegor.errors import FlowControl
-from belphegor.templates import ui_ex, checks, panels, paginators
+from belphegor.templates import checks, panels
 from belphegor.templates.discord_types import Interaction, File
 
 #=============================================================================================================================#
@@ -41,7 +41,7 @@ class Admin(commands.Cog):
         interaction: Interaction,
         extension: ExtensionChoice
     ):
-        panel = panels.Panel()
+        panel = panels.ControlPanel()
         await panel.thinking(interaction)
         extension = extension.name
         fullname_extension = f"belphegor.extensions.{extension}"
@@ -51,10 +51,10 @@ class Admin(commands.Cog):
             else:
                 await interaction.client.load_extension(fullname_extension)
         except commands.ExtensionError:
-            panel.content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```"
+            panel.edit_blueprint(content = f"```\nFailed reloading {extension}:\n{traceback.format_exc()}```")
         else:
             log.info(f"Reloaded {fullname_extension}")
-            panel.content = f"```\nSuccess reloading {extension}```"
+            panel.edit_blueprint(content = f"```\nSuccess reloading {extension}```")
 
         await panel.reply(interaction)
 
@@ -67,17 +67,17 @@ class Admin(commands.Cog):
         interaction: Interaction,
         module: str
     ):
-        panel = panels.Panel()
+        panel = panels.ControlPanel()
         await panel.thinking(interaction)
         try:
             m = importlib.import_module(f"belphegor.{module}")
             importlib.reload(m)
         except :
             traceback.print_exc()
-            panel.content = f"```\nFailed reimporting: {module}```"
+            panel.edit_blueprint(content = f"```\nFailed reimporting: {module}```")
         else:
             print(f"Reimported belphegor.{module}")
-            panel.content = f"```\nSuccess reimporting: {module}```"
+            panel.edit_blueprint(content = f"```\nSuccess reimporting: {module}```")
 
         await panel.reply(interaction)
 
