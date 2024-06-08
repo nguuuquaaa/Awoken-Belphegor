@@ -5,6 +5,7 @@ import asyncio
 from bson.codec_options import TypeRegistry
 import traceback
 import aiohttp
+import redis.asyncio as aredis
 
 from belphegor import utils
 from belphegor.db import MongoClientEX, MongoEX
@@ -16,7 +17,12 @@ log = utils.get_logger()
 #=============================================================================================================================#
 
 class State:
-    pass
+    def setdefault(self, key, value):
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            setattr(self, key, value)
+            return value
 
 #=============================================================================================================================#
 
@@ -41,7 +47,7 @@ class Belphegor(commands.Bot):
     async def setup_hook(self):
         self.session = aiohttp.ClientSession()
         mongo_client = MongoClientEX(
-            host = "db",
+            host = "mongodb",
             port = 27017,
             type_registry = TypeRegistry(fallback_encoder = str),
             tz_aware = True
@@ -50,6 +56,8 @@ class Belphegor(commands.Bot):
             client = mongo_client,
             db = mongo_client.belphegor_db
         )
+
+        self.redis = aredis.Redis(host = "redis")
 
         for extension in self.initial_extensions:
             await self.load_extension(f"belphegor.extensions.{extension}")
@@ -68,4 +76,9 @@ class Belphegor(commands.Bot):
         log.error(f"{event} - args: {args} - kwargs: {kwargs}\n{traceback.format_exc()}")
 
     async def get_prefix(self, message: discord.Message):
-        return [f"<@{self.user.id}> ", f"<@!{self.user.id}> ", self.command_prefix]
+        return [f"<@{self.user.id}> ", f"<@!{self.user.id}> "]
+
+    async def close(self):
+        await super().close()
+        await self.session.close()
+        await self.redis.aclose()

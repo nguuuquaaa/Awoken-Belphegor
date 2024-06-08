@@ -1,18 +1,27 @@
 services:
-  db:
+  mongodb:
     image: mongo:latest
     container_name: bel_db
-    restart: always
+    restart: unless-stopped
     volumes:
       - ./data/db:/data/db
     expose:
       - 27017
 
+  redis:
+    image: redis:latest
+    container_name: dumb_redis
+    restart: unless-stopped
+    volumes:
+      - ./data/redis:/data
+    expose:
+      - 6379
+
   belphegor:
     image: nguuuquaaa/belphegor:latest
     container_name: belphegor
     command: python run.py
-    restart: always
+    restart: unless-stopped
     environment:
       LOGGER: belphegor
       LOG_LEVEL: DEBUG
@@ -20,4 +29,5 @@ services:
       - .:/bel
     working_dir: /bel
     depends_on:
-      - db
+      - mongodb
+      - redis
