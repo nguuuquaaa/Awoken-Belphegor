@@ -305,8 +305,8 @@ class PilotSelector(paginators.SingleRowPaginator):
         paginator.pilots = {p.en_name: p for p in pilots}
         return paginator
 
-    def create_embed(self):
-        embed = super().create_embed()
+    def render_embed(self):
+        embed = super().render_embed()
         embed.title = f"Found {len(self.pilots)} pilots"
         return embed
 
@@ -492,8 +492,8 @@ class PartSelector(paginators.SingleRowPaginator):
         paginator.parts = {f"{p.rank}_{p.name}": p for p in parts}
         return paginator
 
-    def create_embed(self):
-        embed = super().create_embed()
+    def render_embed(self):
+        embed = super().render_embed()
         embed.title = f"Found {len(self.parts)} parts"
         return embed
 
@@ -538,8 +538,8 @@ class PetSelector(paginators.SingleRowPaginator):
         paginator.pets = {p.name: p for p in pets}
         return paginator
 
-    def create_embed(self):
-        embed = super().create_embed()
+    def render_embed(self):
+        embed = super().render_embed()
         embed.title = f"Found {len(self.pets)} pets"
         return embed
 
