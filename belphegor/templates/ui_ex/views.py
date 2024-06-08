@@ -14,7 +14,7 @@ class View(PostInitable, ui.View):
     panel: "ControlPanel"
     allowed_user: discord.User
 
-    def __init__(self, *, timeout: int | float = 180.0, allowed_user: discord.User = None):
+    def __init__(self, *, timeout: int | float = 300.0, allowed_user: discord.User = None):
         super().__init__(timeout = timeout)
         self.allowed_user = allowed_user
         self.target_messages = set()
