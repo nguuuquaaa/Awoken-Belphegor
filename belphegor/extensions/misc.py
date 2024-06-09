@@ -161,7 +161,7 @@ class Misc(commands.Cog):
             name = 'Sauce?',
             callback = self.saucenao_context,
         )
-        self.bot.tree.add_command(self.saucenao_ctx_menu)
+        bot.tree.add_command(self.saucenao_ctx_menu)
 
     async def cog_unload(self):
         self.bot.tree.remove_command(self.saucenao_ctx_menu.name, type = self.saucenao_ctx_menu.type)
@@ -308,11 +308,7 @@ class Misc(commands.Cog):
     ):
         await self.request_sauce(interaction, str(url))
 
-    async def saucenao_context(
-        self,
-        interaction: Interaction,
-        message: discord.Message
-    ):
+    async def saucenao_context(self, interaction: Interaction, message: discord.Message):
         targets = []
         for i, attachment in enumerate(message.attachments):
             targets.append((f"Attachment {i + 1}", attachment.proxy_url))
@@ -324,9 +320,9 @@ class Misc(commands.Cog):
 
         if targets:
             if len(targets) > 1:
-                sauce_paging = SauceSelector.from_images(targets)
-                sauce_paging.request_sauce = self.request_sauce
-                await sauce_paging.initialize(interaction)
+                sauce_selector = SauceSelector.from_images(targets)
+                sauce_selector.request_sauce = self.request_sauce
+                await sauce_selector.initialize(interaction)
             else:
                 await self.request_sauce(interaction, targets[0][1])
         else:

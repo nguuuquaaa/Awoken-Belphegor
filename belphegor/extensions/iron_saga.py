@@ -549,6 +549,23 @@ class IronSaga(commands.Cog):
     def __init__(self, bot: "Belphegor"):
         self.bot = bot
 
+        self.update_parts_ctx_menu = ac.ContextMenu(
+            name = 'Update IS parts',
+            callback = self.update_parts,
+            guild_ids = settings.TEST_GUILDS
+        )
+        self.update_pets_ctx_menu = ac.ContextMenu(
+            name = 'Update IS pets',
+            callback = self.update_pets,
+            guild_ids = settings.TEST_GUILDS
+        )
+        bot.tree.add_command(self.update_parts_ctx_menu)
+        bot.tree.add_command(self.update_pets_ctx_menu)
+
+    async def cog_unload(self):
+        self.bot.tree.remove_command(self.update_parts_ctx_menu.name, type = self.update_parts_ctx_menu.type)
+        self.bot.tree.remove_command(self.update_pets_ctx_menu.name, type = self.update_pets_ctx_menu.type)
+
     @ac.command(name = "pilot")
     @ac.describe(name = "Pilot name")
     async def get_pilot(self, interaction: Interaction, name: str):
@@ -968,17 +985,9 @@ class IronSaga(commands.Cog):
 
         return pilot
 
-    @ac.command(name = "update_part")
-    @ac.guilds(*settings.TEST_GUILDS)
     @ac.check(checks.owner_only())
-    async def update_part(self, interaction: Interaction, message_id: str):
-        try:
-            message_id = int(message_id)
-            message = await interaction.channel.fetch_message(message_id)
-            attachment = message.attachments[0]
-        except (ValueError, IndexError):
-            return await interaction.response.send_message("Invalid file.")
-
+    async def update_parts(self, interaction: Interaction, message: discord.Message):
+        attachment = message.attachments[0]
         bytes_ = await attachment.read()
         data = json.loads(bytes_)
         col = self.bot.mongo.db.iron_saga_parts
@@ -987,17 +996,9 @@ class IronSaga(commands.Cog):
             await col.insert_one(doc)
         await interaction.response.send_message("Done.")
 
-    @ac.command(name = "update_pet")
-    @ac.guilds(*settings.TEST_GUILDS)
     @ac.check(checks.owner_only())
-    async def update_pet(self, interaction: Interaction, message_id: str):
-        try:
-            message_id = int(message_id)
-            message = await interaction.channel.fetch_message(message_id)
-            attachment = message.attachments[0]
-        except (ValueError, IndexError):
-            return await interaction.response.send_message("Invalid file.")
-
+    async def update_pets(self, interaction: Interaction, message: discord.Message):
+        attachment = message.attachments[0]
         bytes_ = await attachment.read()
         data = json.loads(bytes_)
         col = self.bot.mongo.db.iron_saga_pets
