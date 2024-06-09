@@ -114,7 +114,7 @@ class ControlPanel:
         self._view = value
 
     def __new__(cls, *args, **kwargs) -> typing.Self:
-        obj = super().__new__(cls, *args, **kwargs)
+        obj = super().__new__(cls)
         obj.target_message = None
         obj.blueprint = Blueprint()
         obj.view = None
