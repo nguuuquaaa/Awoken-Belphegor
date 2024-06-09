@@ -8,6 +8,7 @@ from yarl import URL
 import aiohttp
 from bs4 import BeautifulSoup as BS
 import typing
+import unicodedata
 
 from belphegor import utils
 from belphegor.settings import settings
@@ -326,6 +327,23 @@ class Misc(commands.Cog):
                 await self.request_sauce(interaction, targets[0][1])
         else:
             await interaction.response.send_message("This message doesn't have any attachment.")
+
+    @commands.command()
+    async def char(self, ctx, *, characters):
+        '''
+            `@bot char [characters]`
+            Check unicode codepoint and name of characters.
+        '''
+        characters = "".join(characters.split())
+        if len(characters) > 20:
+            await ctx.send("Too many characters.")
+        else:
+            def codepoint_generator(characters):
+                for c in characters:
+                    o = ord(c)
+                    s = f"\\U{o:08x}" if o > 0xffff else f"\\u{o:04x}"
+                    yield f"`{s}` - `{c}` - {unicodedata.name(c, 'No name found.')}"
+            await ctx.send("\n".join(codepoint_generator(characters)))
 
 #=============================================================================================================================#
 
