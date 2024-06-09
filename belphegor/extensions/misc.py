@@ -9,6 +9,7 @@ import aiohttp
 from bs4 import BeautifulSoup as BS
 import typing
 import unicodedata
+from collections.abc import Callable
 
 from belphegor import utils
 from belphegor.settings import settings
@@ -99,6 +100,13 @@ class Calculator(paginators.ContinuousInput):
 class SauceSelectMenu(paginators.PaginatorSelect):
     paginator: "SauceSelector"
 
+    def add_items_as_options(self, items: list[paginators.PageItem], current_index: int):
+        for i, item in enumerate(items):
+            self.add_option(
+                label = f"{i + current_index + 1}. {item.value[0]}",
+                value = item.value[0]
+            )
+
     async def callback(self, interaction: Interaction):
         paginator = self.paginator
         url = paginator.images[self.values[0]]
@@ -106,14 +114,18 @@ class SauceSelectMenu(paginators.PaginatorSelect):
         paginator.view = None
         await paginator.request_sauce(interaction, url)
 
+class SauceEmbedTemplate(paginators.PaginatorEmbedTemplate):
+    description: Callable[[paginators.PageItem, int], str] = lambda item, index: f"{index + 1}. [{item.value[0]}]({item.value[1]})"
+
 class SauceSelector(paginators.SingleRowPaginator):
     images: dict[str, str]
 
     select_menu: SauceSelectMenu
+    embed_template: SauceEmbedTemplate
 
     @classmethod
     def from_images(cls, images: list[tuple[str, str]]):
-        paginator = cls([paginators.PageItem(value = name) for name, url in images], selectable = True)
+        paginator = cls([paginators.PageItem(value = im) for im in images], selectable = True)
         paginator.images = {name: url for name, url in images}
         return paginator
 
