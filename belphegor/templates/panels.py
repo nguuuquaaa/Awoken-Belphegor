@@ -105,10 +105,7 @@ class ControlPanel:
 
     @property
     def view(self) -> ui_ex.View | None:
-        try:
-            return self._view
-        except AttributeError:
-            return None
+        return self._view
 
     @view.setter
     def view(self, value: ui_ex.View | None):
@@ -116,10 +113,15 @@ class ControlPanel:
             value.panel = self
         self._view = value
 
+    def __new__(cls, *args, **kwargs) -> typing.Self:
+        obj = super().__new__(cls, *args, **kwargs)
+        obj.target_message = None
+        obj.blueprint = Blueprint()
+        obj.view = None
+        return obj
+
     def __init__(self):
-        self.target_message = None
-        self.blueprint = Blueprint()
-        self.view = None
+        pass
 
     def edit_blueprint(
         self,

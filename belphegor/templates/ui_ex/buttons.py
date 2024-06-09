@@ -81,7 +81,7 @@ class ConfirmedButton(GrayButton[_V]):
 
 class DeniedButton(GrayButton[_V]):
     label: str = None
-    emoji: EmojiType = "\u2716"
+    emoji: EmojiType = "\u274c"
 
 #=============================================================================================================================#
 

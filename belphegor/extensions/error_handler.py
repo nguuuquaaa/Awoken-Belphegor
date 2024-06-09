@@ -66,7 +66,7 @@ class ErrorHandler(commands.Cog):
     async def on_app_command_error(self, interaction: Interaction, error: Exception):
         if not isinstance(error, discord.Forbidden):
             if isinstance(error, errors.CustomError):
-                await ControlPanel.from_parts(error.message).reply(interaction)
+                await ControlPanel.from_parts(content = error.message).reply(interaction)
             else:
                 prt_err = "\n".join(traceback.format_exception(error))
                 msg = f"Interaction {interaction.type.name} raised an error:\n{prt_err}"

@@ -29,10 +29,12 @@ class View(PostInitable, ui.View):
         else:
             return interaction.user == self.allowed_user
 
-    async def on_timeout(self):
+    def shutdown(self):
         self.stop()
         for item in self.children:
             item.disabled = True
 
+    async def on_timeout(self):
+        self.shutdown()
         if self.panel.target_message:
             await self.panel.target_message.edit(view = self)

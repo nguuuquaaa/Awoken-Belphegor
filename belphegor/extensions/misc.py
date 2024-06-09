@@ -91,7 +91,6 @@ class Calculator(paginators.ContinuousInput):
     continuous_input_button: MathContinuousInputButton
 
     def __init__(self):
-        super().__init__()
         self.parser = calculator.MathParse()
 
 #=============================================================================================================================#
@@ -127,28 +126,28 @@ class SauceSelector(paginators.SingleRowPaginator):
 
 #=============================================================================================================================#
 
-class SaucenaoConfirmed(paginators.ConfirmedButton):
+class HiddenResultsConfirmed(paginators.ConfirmedButton):
     paginator: "SaucenaoHiddenResults"
 
     async def callback(self, interaction: Interaction):
         self.paginator.edit_blueprint(embed = self.paginator.hidden_results)
-        await self.paginator.update()
+        await self.paginator.reply(interaction)
 
-class SaucenaoDenied(paginators.DeniedButton):
+class HiddenResultsDenied(paginators.DeniedButton):
     paginator: "SaucenaoHiddenResults"
 
     async def callback(self, interaction: Interaction):
-        self.view.stop()
-        await interaction.response.edit_message(view = None)
+        self.view.shutdown()
+        await self.paginator.reply(interaction)
 
 class SaucenaoHiddenResults(paginators.YesNoPrompt):
     hidden_results: discord.Embed
 
+    confirmed_button: HiddenResultsConfirmed
+    denied_button: HiddenResultsDenied
+
     def __init__(self, hidden_results: discord.Embed):
         self.hidden_results = hidden_results
-
-    def render(self):
-        super().render()
         self.edit_blueprint(content = "No result found.\nDo you want to see low similarity results?")
 
 #=============================================================================================================================#

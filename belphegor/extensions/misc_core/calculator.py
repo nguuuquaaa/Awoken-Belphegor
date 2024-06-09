@@ -15,6 +15,14 @@ SPECIAL_NUMBERS = (INF, -INF, NAN, ZINF)
 
 #=============================================================================================================================#
 
+class ParseError(Exception):
+    pass
+
+class CommonParseError(Exception):
+    pass
+
+#=============================================================================================================================#
+
 #I hate this, but sympy is pretty dumb for raising TypeError instead of return False for NaN comparison
 def always_false(self, other):
     return False
@@ -82,14 +90,6 @@ def radians(deg):
 
 def round_float(number):
     return number.round()
-
-#=============================================================================================================================#
-
-class ParseError(Exception):
-    pass
-
-class CommonParseError(Exception):
-    pass
 
 #=============================================================================================================================#
 
@@ -648,7 +648,6 @@ class MathFunction(BaseParse):
     def __init__(self, text, args, *, variables, functions, base):
         if not text:
             raise CommonParseError
-        super().__init__()
         self.user_variables.update(variables)
         self.user_variables.update({k: NoValue(k) for k in args})
         self.user_functions.update(functions)

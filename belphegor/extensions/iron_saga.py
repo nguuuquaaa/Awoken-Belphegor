@@ -374,7 +374,6 @@ class PilotDisplay(paginators.BasePaginator):
     skin_select: PilotSkinSelect
 
     def __init__(self, pilot: Pilot):
-        super().__init__()
         self.pilot = pilot
         self.skins = utils.CircleIter([utils.CircleIter(s, start_index = 0) for s in utils.grouper(pilot.skins, self.SKIN_SELECT_SIZE, incomplete = "missing")], start_index = -1)
 

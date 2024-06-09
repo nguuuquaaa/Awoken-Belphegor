@@ -213,7 +213,6 @@ class DaemonDisplay(paginators.BasePaginator):
     image_button: DaemonImageButton
 
     def __init__(self, daemon: Daemon):
-        super().__init__()
         self.daemon = daemon
         self.images = utils.CircleIter([p for p in [daemon.pic_url, daemon.artwork_url] if p], start_index = 0)
         self.render = functools.partial(daemon.display_stats, self)

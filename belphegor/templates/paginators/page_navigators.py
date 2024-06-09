@@ -206,7 +206,6 @@ class SingleRowPaginator(BasePaginator, typing.Generic[_VT]):
     embed_template: PaginatorEmbedTemplate
 
     def __init__(self, items: PageItem[_VT] | list[PageItem[_VT]] | list[_VT], *, page_size: int = 20, selectable: bool = False):
-        super().__init__()
         if isinstance(items, PageItem):
             self.items = items.children
         else:
