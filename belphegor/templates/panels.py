@@ -105,7 +105,10 @@ class ControlPanel:
 
     @property
     def view(self) -> ui_ex.View | None:
-        return self._view
+        try:
+            return self._view
+        except AttributeError:
+            return None
 
     @view.setter
     def view(self, value: ui_ex.View | None):
