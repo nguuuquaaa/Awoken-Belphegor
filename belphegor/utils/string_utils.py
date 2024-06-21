@@ -24,6 +24,13 @@ class ProgressBar:
     def done(self):
         return f"{self.done_message}\nProgress: {self.construct(1.0)}"
 
+class FakeProgressBar(ProgressBar):
+    def progress(self, rate: float):
+        return self.progress_message
+
+    def done(self):
+        return self.done_message
+
 #=============================================================================================================================#
 
 _WHITESPACE = re.compile(r"\s*")

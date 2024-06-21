@@ -12,7 +12,8 @@ import os
 import typing
 import enum
 from yarl import URL
-from email.message import Message
+import time
+import mimetypes
 
 from belphegor import utils
 from belphegor.settings import settings
@@ -160,21 +161,38 @@ class Admin(commands.Cog):
         url: ac.Transform[URL, transformers.URLTransformer]
     ):
         chunk_size = 1024 * 1024
-        await interaction.response.defer(thinking = True)
+        panel = panels.ControlPanel()
+        await panel.thinking(interaction)
         async with self.bot.session.get(url, headers = {"User-Agent": settings.USER_AGENT}) as resp:
-            log.debug(resp.headers)
-            m = Message()
-            m["content-type"] = resp.content_disposition
-            filename = m.get_param("filename")
-            if filename is None:
-                filename = "file"
+            if resp.content_length:
+                filesize = resp.content_length
+                progress_bar = utils.ProgressBar(progress_message = f"Downloading {filesize / 1024 / 1024:.02f}MB...")
+            else:
+                filesize = 1
+                progress_bar = utils.FakeProgressBar(progress_message = f"Downloading...")
+
+            await panel.edit_blueprint(content = progress_bar.progress(0)).reply(interaction)
+
+            if resp.content_disposition:
+                filename = resp.content_disposition.filename or "file"
+            else:
+                if resp.content_type:
+                    filename = "file" + mimetypes.guess_extension(resp.content_type)
+                else:
+                    filename = "file"
 
             b = BytesIO()
+            start = time.monotonic()
+            downloaded = 0
             async for chunk in resp.content.iter_chunked(chunk_size):
                 b.write(chunk)
+                downloaded += len(chunk)
+                current = time.monotonic()
+                if current - start > 10:
+                    await panel.edit_blueprint(content = progress_bar.progress(downloaded / filesize)).reply(interaction)
 
         b.seek(0)
-        await interaction.followup.send(file = discord.File(b, filename = filename))
+        await panel.edit_blueprint(content = progress_bar.done(), file = discord.File(b, filename = filename)).reply(interaction)
 
 #=============================================================================================================================#
 
