@@ -6,17 +6,19 @@ import sys
 import traceback
 import textwrap
 import asyncio
-from io import StringIO
+from io import StringIO, BytesIO
 from contextlib import redirect_stdout
 import os
 import typing
 import enum
+from yarl import URL
+from email.message import Message
 
 from belphegor import utils
 from belphegor.settings import settings
 from belphegor.bot import Belphegor
 from belphegor.errors import FlowControl
-from belphegor.templates import checks, panels
+from belphegor.templates import checks, panels, transformers
 from belphegor.templates.discord_types import Interaction, File
 
 #=============================================================================================================================#
@@ -148,6 +150,31 @@ class Admin(commands.Cog):
                 case "global":
                     await self.bot.tree.sync()
         await ctx.send("Synced.")
+
+    @ac.command(name = "download")
+    @ac.guilds(*settings.TEST_GUILDS)
+    @ac.check(checks.owner_only())
+    async def download(
+        self,
+        interaction: Interaction,
+        url: ac.Transform[URL, transformers.URLTransformer]
+    ):
+        chunk_size = 1024 * 1024
+        await interaction.response.defer(thinking = True)
+        async with self.bot.session.get(url, headers = {"User-Agent": settings.USER_AGENT}) as resp:
+            log.debug(resp.headers)
+            m = Message()
+            m["content-type"] = resp.content_disposition
+            filename = m.get_param("filename")
+            if filename is None:
+                filename = "file"
+
+            b = BytesIO()
+            async for chunk in resp.content.iter_chunked(chunk_size):
+                b.write(chunk)
+
+        b.seek(0)
+        await interaction.followup.send(file = discord.File(b, filename = filename))
 
 #=============================================================================================================================#
 
