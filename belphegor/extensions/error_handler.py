@@ -1,10 +1,10 @@
 import discord
+from discord import app_commands as ac
 from discord.ext import commands
 import traceback
 import sys
 import asyncio
 import contextlib
-from collections.abc import AsyncGenerator
 
 from belphegor import utils, errors
 from belphegor.settings import settings
@@ -67,6 +67,12 @@ class ErrorHandler(commands.Cog):
         if not isinstance(error, discord.Forbidden):
             if isinstance(error, errors.CustomError):
                 await ControlPanel.from_parts(content = error.message).reply(interaction)
+            elif isinstance(error, ac.TransformerError):
+                cause = error.__cause__
+                if isinstance(cause, errors.CustomError):
+                    await ControlPanel.from_parts(content = cause.message).reply(interaction)
+                else:
+                    await ControlPanel.from_parts(content = f"Unrecognized value:\n```\n{error.value}\n```").reply(interaction)
             else:
                 prt_err = "\n".join(traceback.format_exception(error))
                 msg = f"Interaction {interaction.type.name} raised an error:\n{prt_err}"
