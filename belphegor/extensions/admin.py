@@ -6,20 +6,17 @@ import sys
 import traceback
 import textwrap
 import asyncio
-from io import StringIO, BytesIO
+from io import StringIO
 from contextlib import redirect_stdout
 import os
 import typing
 import enum
-from yarl import URL
-import time
-import mimetypes
 
 from belphegor import utils
 from belphegor.settings import settings
 from belphegor.bot import Belphegor
 from belphegor.errors import FlowControl
-from belphegor.templates import checks, panels, transformers
+from belphegor.templates import checks, panels
 from belphegor.templates.discord_types import Interaction, File
 
 #=============================================================================================================================#
@@ -151,48 +148,6 @@ class Admin(commands.Cog):
                 case "global":
                     await self.bot.tree.sync()
         await ctx.send("Synced.")
-
-    @ac.command(name = "download")
-    @ac.guilds(*settings.TEST_GUILDS)
-    @ac.check(checks.owner_only())
-    async def download(
-        self,
-        interaction: Interaction,
-        url: ac.Transform[URL, transformers.URLTransformer]
-    ):
-        chunk_size = 1024 * 1024
-        panel = panels.ControlPanel()
-        await panel.thinking(interaction)
-        async with self.bot.session.get(url, headers = {"User-Agent": settings.USER_AGENT}) as resp:
-            if resp.content_length:
-                filesize = resp.content_length
-                progress_bar = utils.ProgressBar(progress_message = f"Downloading {filesize / 1024 / 1024:.02f}MB...")
-            else:
-                filesize = 1
-                progress_bar = utils.FakeProgressBar(progress_message = f"Downloading...")
-
-            await panel.edit_blueprint(content = progress_bar.progress(0)).reply(interaction)
-
-            if resp.content_disposition:
-                filename = resp.content_disposition.filename or "file"
-            else:
-                if resp.content_type:
-                    filename = "file" + mimetypes.guess_extension(resp.content_type)
-                else:
-                    filename = "file"
-
-            b = BytesIO()
-            start = time.monotonic()
-            downloaded = 0
-            async for chunk in resp.content.iter_chunked(chunk_size):
-                b.write(chunk)
-                downloaded += len(chunk)
-                current = time.monotonic()
-                if current - start > 10:
-                    await panel.edit_blueprint(content = progress_bar.progress(downloaded / filesize)).reply(interaction)
-
-        b.seek(0)
-        await panel.edit_blueprint(content = progress_bar.done(), file = discord.File(b, filename = filename)).reply(interaction)
 
 #=============================================================================================================================#
 
