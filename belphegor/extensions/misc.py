@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup as BS
 import typing
 import unicodedata
 from collections.abc import Callable
+import re
+import random
 
 from belphegor import utils
 from belphegor.settings import settings
@@ -340,8 +342,8 @@ class Misc(commands.Cog):
         else:
             await interaction.response.send_message("This message doesn't have any attachment.")
 
-    @commands.command()
-    async def char(self, ctx, *, characters):
+    @commands.command(name = "char")
+    async def cmd_char(self, ctx, *, characters: str):
         '''
             `@bot char [characters]`
             Check unicode codepoint and name of characters.
@@ -356,6 +358,16 @@ class Misc(commands.Cog):
                     s = f"\\U{o:08x}" if o > 0xffff else f"\\u{o:04x}"
                     yield f"`{s}` - `{c}` - {unicodedata.name(c, 'No name found.')}"
             await ctx.send("\n".join(codepoint_generator(characters)))
+
+    @commands.command(name = "choose")
+    async def cmd_choose(self, ctx, *, choices: str):
+        '''
+            `@bot choose [choices]`
+            Choose a random item out of [choices].
+            List of choices is separated by either semicolon or the word "or".
+        '''
+        choices = list(filter(None, (c.strip() for c in re.split(r"(?:\b;\b|\bor\b)", choices))))
+        await ctx.send(random.choice(choices))
 
 #=============================================================================================================================#
 

@@ -53,6 +53,12 @@ class DaemonQuote(BaseModel):
     text: str
     url: str | None
 
+    def hyperlink(self):
+        if self.url:
+            return f"[\"{self.text}\"]({self.url})"
+        else:
+            return f"\"{self.text}\""
+
 class DaemonAllQuotes(BaseModel):
     main: DaemonQuote
     skill: DaemonQuote
@@ -136,10 +142,10 @@ class Daemon(BaseModel):
         data_embed.add_field(
             name = "Quotes",
             value =
-                f"Main: [\"{quotes.main.text}\"]({quotes.main.url})\n"
-                f"Skill: [\"{quotes.skill.text}\"]({quotes.skill.url})\n"
-                f"Summon: [\"{quotes.summon.text}\"]({quotes.summon.url})\n"
-                f"Limit break: [\"{quotes.limit_break.text}\"]({quotes.limit_break.url})\n",
+                f"Main: {quotes.main.hyperlink()}\n"
+                f"Skill: {quotes.skill.hyperlink()}\n"
+                f"Summon: {quotes.summon.hyperlink()}\n"
+                f"Limit break: {quotes.limit_break.hyperlink()}",
             inline = False
         )
 
